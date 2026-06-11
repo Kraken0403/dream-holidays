@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ReportsService } from './reports.service';
 
@@ -9,4 +9,28 @@ export class ReportsController {
 
   @Get('dashboard')
   dashboard() { return this.service.dashboard(); }
+
+  @Get('aging/receivables')
+  agingReceivables() { return this.service.agingReceivables(); }
+
+  @Get('aging/payables')
+  agingPayables() { return this.service.agingPayables(); }
+
+  @Get('pl')
+  profitAndLoss(@Query() query: any) { return this.service.profitAndLoss(query); }
+
+  @Get('trial-balance')
+  trialBalance() { return this.service.trialBalance(); }
+
+  @Get('clients')
+  listClients() { return this.service.listClients(); }
+
+  @Get('vendors')
+  listVendors() { return this.service.listVendors(); }
+
+  @Get('client-statement/:id')
+  clientStatement(@Param('id') id: string, @Query() query: any) { return this.service.clientStatement(Number(id), query); }
+
+  @Get('vendor-statement/:id')
+  vendorStatement(@Param('id') id: string, @Query() query: any) { return this.service.vendorStatement(Number(id), query); }
 }
