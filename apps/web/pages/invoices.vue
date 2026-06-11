@@ -1,109 +1,147 @@
 <template>
-  <div class="page">
-    <div class="page-head"><div><h1>Invoices</h1><p class="sub">Client billing and payment tracking.</p></div></div>
-    <div class="toolbar">
-      <div class="muted">{{ invoices.length }} invoices</div>
-      <button class="btn" type="button" @click="openCreate">Create Invoice</button>
-    </div>
-    <div class="card table-wrap">
-      <table>
-        <thead><tr><th>Invoice</th><th>Client</th><th>Booking</th><th>Total</th><th>Paid</th><th>Outstanding</th><th>Action</th></tr></thead>
-        <tbody>
-          <tr v-for="i in invoices" :key="i.id">
-            <td><strong>{{ i.invoiceNumber }}</strong><div><span class="badge">{{ i.status }}</span></div></td>
-            <td>{{ i.client?.name }}</td>
-            <td>{{ i.booking?.bookingNumber || '-' }}</td>
-            <td class="money">{{ formatMoney(i.grandTotal) }}</td>
-            <td class="money">{{ formatMoney(i.paidAmount) }}</td>
-            <td class="money">{{ formatMoney(i.outstandingAmount) }}</td>
-            <td><button class="btn secondary small" type="button" @click="openPayment(i)">Add Payment</button></td>
-          </tr>
-          <tr v-if="!invoices.length"><td colspan="7" class="muted">No invoices found.</td></tr>
-        </tbody>
-      </table>
+  <div>
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900">Invoices</h1>
+        <p class="text-sm text-gray-500 mt-1">Client billing and payment tracking.</p>
+      </div>
+      <button @click="openCreate" class="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+        Create Invoice
+      </button>
     </div>
 
-    <div v-if="showCreate" class="modal-backdrop" @click.self="showCreate = false">
-      <div class="modal">
-        <div class="modal-head"><h2 class="modal-title">Create Invoice</h2><button class="btn ghost small" type="button" @click="showCreate = false">Close</button></div>
-        <form class="form" @submit.prevent="saveInvoice">
-          <div class="modal-body form">
-            <div class="form-row">
-              <div class="field"><label>Client</label><select v-model="form.clientId" class="input" required><option value="">Select client</option><option v-for="c in clients" :key="c.id" :value="c.id">{{ c.name }}</option></select></div>
-              <div class="field"><label>Company</label><select v-model="form.companyId" class="input" required><option value="">Select company</option><option v-for="c in companies" :key="c.id" :value="c.id">{{ c.name }}</option></select></div>
-            </div>
-            <div class="form-row">
-              <div class="field"><label>Booking</label><select v-model="form.bookingId" class="input"><option value="">None</option><option v-for="b in bookings" :key="b.id" :value="b.id">{{ b.bookingNumber }} - {{ b.title }}</option></select></div>
-              <div class="field"><label>Invoice Date</label><input v-model="form.invoiceDate" class="input" type="date" required /></div>
-            </div>
-            <div class="form-row">
-              <div class="field"><label>Due Date</label><input v-model="form.dueDate" class="input" type="date" /></div>
-              <div class="field"><label>Place of Supply</label><input v-model="form.placeOfSupply" class="input" /></div>
-            </div>
-            <div class="item-box">
-              <div class="toolbar" style="margin-bottom:10px;"><strong>Items</strong><button class="btn secondary small" type="button" @click="addInvoiceItem">Add Item</button></div>
-              <div v-for="(item, index) in form.items" :key="index" class="item-box" style="background:#fff; margin-bottom:10px;">
-                <div class="field"><label>Description</label><input v-model="item.description" class="input" required /></div>
-                <div class="form-row">
-                  <div class="field"><label>Qty</label><input v-model.number="item.quantity" class="input" type="number" min="1" /></div>
-                  <div class="field"><label>Rate</label><input v-model.number="item.rate" class="input" type="number" min="0" /></div>
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-gray-100 bg-gray-50">
+              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Invoice</th>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Client</th>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Booking</th>
+              <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</th>
+              <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Paid</th>
+              <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Outstanding</th>
+              <th class="px-4 py-3"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-50">
+            <tr v-for="i in invoices" :key="i.id" class="hover:bg-gray-50 transition-colors">
+              <td class="px-4 py-3">
+                <div class="font-semibold text-gray-900">{{ i.invoiceNumber }}</div>
+                <span :class="statusBadge(i.status)" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-1">{{ i.status }}</span>
+              </td>
+              <td class="px-4 py-3 text-gray-700">{{ i.client?.name }}</td>
+              <td class="px-4 py-3 text-gray-500">{{ i.booking?.bookingNumber || '—' }}</td>
+              <td class="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums">{{ fmt(i.grandTotal) }}</td>
+              <td class="px-4 py-3 text-right text-green-600 tabular-nums font-medium">{{ fmt(i.paidAmount) }}</td>
+              <td class="px-4 py-3 text-right font-bold tabular-nums" :class="Number(i.outstandingAmount) > 0 ? 'text-orange-600' : 'text-gray-400'">{{ fmt(i.outstandingAmount) }}</td>
+              <td class="px-4 py-3">
+                <button v-if="Number(i.outstandingAmount) > 0" type="button" @click="openPayment(i)"
+                  class="px-3 py-1.5 text-xs font-semibold text-blue-600 border border-blue-200 hover:bg-blue-50 rounded-lg transition-colors">
+                  Add Payment
+                </button>
+              </td>
+            </tr>
+            <tr v-if="!invoices.length"><td colspan="7" class="px-4 py-10 text-center text-gray-400">No invoices yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Create Invoice Modal -->
+    <AppModal v-model="showCreate" title="Create Invoice" size="lg">
+      <form id="inv-form" @submit.prevent="saveInvoice" class="space-y-4">
+        <div class="grid grid-cols-2 gap-4">
+          <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Client *</label><select v-model="form.clientId" :class="INP" required><option value="">Select client</option><option v-for="c in clients" :key="c.id" :value="c.id">{{ c.name }}</option></select></div>
+          <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Company *</label><select v-model="form.companyId" :class="INP" required><option value="">Select company</option><option v-for="c in companies" :key="c.id" :value="c.id">{{ c.name }}</option></select></div>
+        </div>
+        <div class="grid grid-cols-3 gap-4">
+          <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Booking</label><select v-model="form.bookingId" :class="INP"><option value="">None</option><option v-for="b in bookings" :key="b.id" :value="b.id">{{ b.bookingNumber }}</option></select></div>
+          <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Invoice Date *</label><input v-model="form.invoiceDate" type="date" :class="INP" required /></div>
+          <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Due Date</label><input v-model="form.dueDate" type="date" :class="INP" /></div>
+        </div>
+
+        <!-- Items -->
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="text-sm font-semibold text-gray-900">Invoice Items</h4>
+            <button type="button" @click="addInvoiceItem" class="text-sm text-blue-600 hover:text-blue-700 font-medium">+ Add Item</button>
+          </div>
+          <div class="space-y-3">
+            <div v-for="(item, i) in form.items" :key="i" class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+              <div class="mb-3"><label class="block text-xs font-medium text-gray-600 mb-1">Description *</label><input v-model="item.description" :class="INP + ' bg-white'" required /></div>
+              <div class="grid grid-cols-4 gap-3 items-end">
+                <div><label class="block text-xs font-medium text-gray-600 mb-1">Qty</label><input v-model.number="item.quantity" type="number" min="1" :class="INP + ' bg-white'" /></div>
+                <div><label class="block text-xs font-medium text-gray-600 mb-1">Rate</label><input v-model.number="item.rate" type="number" min="0" :class="INP + ' bg-white'" /></div>
+                <div><label class="block text-xs font-medium text-gray-600 mb-1">Tax</label><input v-model.number="item.taxAmount" type="number" min="0" :class="INP + ' bg-white'" /></div>
+                <div class="flex items-end gap-2">
+                  <div class="flex-1"><label class="block text-xs font-medium text-gray-600 mb-1">Total</label><div :class="INP + ' bg-gray-100 font-semibold text-gray-700'">{{ fmt(itemTotal(item)) }}</div></div>
+                  <button type="button" @click="form.items.splice(i, 1)" class="mb-0.5 p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
                 </div>
-                <div class="form-row">
-                  <div class="field"><label>Tax</label><input v-model.number="item.taxAmount" class="input" type="number" min="0" /></div>
-                  <div class="field"><label>Total</label><input class="input" :value="formatMoney(itemTotal(item))" disabled /></div>
-                </div>
-                <button class="btn danger small" type="button" @click="form.items.splice(index, 1)">Remove Item</button>
               </div>
             </div>
           </div>
-          <div class="modal-actions"><button class="btn secondary" type="button" @click="showCreate = false">Cancel</button><button class="btn">Save Invoice</button></div>
-        </form>
-      </div>
-    </div>
+        </div>
+      </form>
+      <template #footer>
+        <button type="button" @click="showCreate = false" class="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg">Cancel</button>
+        <button type="submit" form="inv-form" class="px-4 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg">Save Invoice</button>
+      </template>
+    </AppModal>
 
-    <div v-if="paymentInvoice" class="modal-backdrop" @click.self="paymentInvoice = null">
-      <div class="modal" style="width:min(520px, 100%);">
-        <div class="modal-head"><h2 class="modal-title">Add Payment</h2><button class="btn ghost small" type="button" @click="paymentInvoice = null">Close</button></div>
-        <form class="form" @submit.prevent="pay">
-          <div class="modal-body form">
-            <div class="muted">{{ paymentInvoice.invoiceNumber }} outstanding {{ formatMoney(paymentInvoice.outstandingAmount) }}</div>
-            <div class="field"><label>Amount</label><input v-model.number="payment.amount" class="input" type="number" min="1" required /></div>
-            <div class="field"><label>Payment Mode</label><input v-model="payment.paymentMode" class="input" /></div>
-          </div>
-          <div class="modal-actions"><button class="btn secondary" type="button" @click="paymentInvoice = null">Cancel</button><button class="btn">Add Payment</button></div>
-        </form>
-      </div>
-    </div>
+    <!-- Payment Modal -->
+    <AppModal v-model="showPayment" title="Record Payment" size="sm">
+      <form v-if="paymentInvoice" id="pay-form" @submit.prevent="pay" class="space-y-4">
+        <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm">
+          <div class="font-semibold text-amber-800">{{ paymentInvoice.invoiceNumber }}</div>
+          <div class="text-amber-700 mt-0.5">Outstanding: <strong>{{ fmt(paymentInvoice.outstandingAmount) }}</strong></div>
+        </div>
+        <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Amount *</label><input v-model.number="payment.amount" type="number" min="1" :class="INP" required /></div>
+        <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Payment Mode</label><input v-model="payment.paymentMode" :class="INP" /></div>
+        <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Reference #</label><input v-model="payment.referenceNumber" :class="INP" placeholder="Cheque / UTR / Transaction ID" /></div>
+      </form>
+      <template #footer>
+        <button type="button" @click="showPayment = false" class="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg">Cancel</button>
+        <button type="submit" form="pay-form" class="px-4 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg">Record Payment</button>
+      </template>
+    </AppModal>
   </div>
 </template>
+
 <script setup>
 const { request } = useApi()
 const { formatMoney } = useMoney()
 const invoices = ref([]), clients = ref([]), companies = ref([]), bookings = ref([])
 const showCreate = ref(false)
+const showPayment = ref(false)
 const paymentInvoice = ref(null)
+const INP = 'w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow'
 const today = () => new Date().toISOString().slice(0, 10)
+const fmt = (v) => formatMoney(v || 0)
 const blankItem = () => ({ description: '', quantity: 1, rate: 0, taxAmount: 0 })
 const blankForm = () => ({ clientId: '', companyId: '', bookingId: '', invoiceDate: today(), dueDate: '', placeOfSupply: '', items: [blankItem()] })
 const form = reactive(blankForm())
-const payment = reactive({ amount: '', paymentMode: 'Bank Transfer' })
+const payment = reactive({ amount: '', paymentMode: 'Bank Transfer', referenceNumber: '' })
+
 function itemTotal(item) { return Number(item.quantity || 1) * Number(item.rate || 0) + Number(item.taxAmount || 0) }
-function resetForm() { Object.assign(form, blankForm()) }
+function openCreate() { Object.assign(form, blankForm()); showCreate.value = true }
+function openPayment(inv) { paymentInvoice.value = inv; Object.assign(payment, { amount: Number(inv.outstandingAmount || 0), paymentMode: 'Bank Transfer', referenceNumber: '' }); showPayment.value = true }
 function addInvoiceItem() { form.items.push(blankItem()) }
-function openCreate() { resetForm(); showCreate.value = true }
-function openPayment(invoice) { paymentInvoice.value = invoice; Object.assign(payment, { amount: Number(invoice.outstandingAmount || 0), paymentMode: 'Bank Transfer' }) }
+
+function statusBadge(s) {
+  return { DRAFT: 'bg-gray-100 text-gray-700', SENT: 'bg-indigo-100 text-indigo-700', PARTIALLY_PAID: 'bg-yellow-100 text-yellow-700', PAID: 'bg-green-100 text-green-700', OVERDUE: 'bg-red-100 text-red-700', CANCELLED: 'bg-red-100 text-red-700' }[s] || 'bg-gray-100 text-gray-600'
+}
+
 async function load() {
   [invoices.value, clients.value, companies.value, bookings.value] = await Promise.all([
-    request('/invoices'),
-    request('/clients'),
-    request('/companies'),
-    request('/bookings'),
+    request('/invoices'), request('/clients'), request('/companies'), request('/bookings'),
   ])
 }
 async function saveInvoice() {
   const payload = JSON.parse(JSON.stringify(form))
   payload.bookingId = payload.bookingId || null
-  payload.items = payload.items.map(item => ({ ...item, total: itemTotal(item) }))
+  payload.items = payload.items.map(i => ({ ...i, total: itemTotal(i) }))
   await request('/invoices', { method: 'POST', body: payload })
   showCreate.value = false
   await load()
@@ -111,8 +149,9 @@ async function saveInvoice() {
 async function pay() {
   if (!paymentInvoice.value) return
   await request(`/invoices/${paymentInvoice.value.id}/payments`, { method: 'POST', body: payment })
-  paymentInvoice.value = null
+  showPayment.value = false
   await load()
 }
 onMounted(load)
 </script>
+

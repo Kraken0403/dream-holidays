@@ -1,31 +1,57 @@
 <template>
-  <div class="page">
-    <div class="page-head">
-      <div>
-        <h1>Dashboard</h1>
-        <p class="sub">Sales, vendor cost, receivables, payables and cash position.</p>
+  <div>
+    <div class="mb-6">
+      <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
+      <p class="text-sm text-gray-500 mt-1">Financial overview — sales, margins, receivables and payables.</p>
+    </div>
+
+    <!-- Primary KPI row -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <KpiCard label="Booking Sales"    :value="fmt(data.bookingSale)"     icon="currency" color="blue" />
+      <KpiCard label="Vendor Cost"      :value="fmt(data.bookingCost)"     icon="truck"    color="orange" />
+      <KpiCard label="Expected Margin"  :value="fmt(data.expectedMargin)"  icon="trend"    color="green" />
+      <KpiCard label="Invoice Sales"    :value="fmt(data.invoiceSales)"    icon="doc"      color="purple" />
+    </div>
+
+    <!-- Cash flow row -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <KpiCard label="Client Received"  :value="fmt(data.clientReceived)"  icon="in"       color="green" />
+      <KpiCard label="Vendor Paid"      :value="fmt(data.vendorPaid)"      icon="out"      color="red" />
+      <KpiCard label="Receivable"       :value="fmt(data.receivable)"      icon="clock"    color="yellow" />
+      <KpiCard label="Payable"          :value="fmt(data.payable)"         icon="clock"    color="yellow" />
+    </div>
+
+    <!-- Net cash position -->
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-sm font-medium text-gray-500">Net Cash Position</p>
+          <p class="text-3xl font-bold mt-1" :class="(data.netCashPosition || 0) >= 0 ? 'text-green-600' : 'text-red-600'">
+            {{ fmt(data.netCashPosition) }}
+          </p>
+          <p class="text-xs text-gray-400 mt-1">Client received − Vendor paid</p>
+        </div>
+        <div class="w-14 h-14 rounded-xl flex items-center justify-center" :class="(data.netCashPosition || 0) >= 0 ? 'bg-green-50' : 'bg-red-50'">
+          <svg class="w-7 h-7" :class="(data.netCashPosition || 0) >= 0 ? 'text-green-600' : 'text-red-600'" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+        </div>
       </div>
     </div>
 
-    <div class="grid grid-4">
-      <div v-for="item in cards" :key="item.label" class="card kpi">
-        <div class="label">{{ item.label }}</div>
-        <div class="value">{{ formatMoney(item.value) }}</div>
+    <!-- Count row -->
+    <div class="grid grid-cols-3 gap-4">
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 text-center">
+        <div class="text-3xl font-bold text-gray-900">{{ data.bookingCount || 0 }}</div>
+        <div class="text-sm text-gray-500 mt-1">Bookings</div>
       </div>
-    </div>
-
-    <div class="grid grid-3" style="margin-top: 16px;">
-      <div class="card kpi">
-        <div class="label">Bookings</div>
-        <div class="value">{{ data.bookingCount || 0 }}</div>
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 text-center">
+        <div class="text-3xl font-bold text-gray-900">{{ data.invoiceCount || 0 }}</div>
+        <div class="text-sm text-gray-500 mt-1">Invoices</div>
       </div>
-      <div class="card kpi">
-        <div class="label">Invoices</div>
-        <div class="value">{{ data.invoiceCount || 0 }}</div>
-      </div>
-      <div class="card kpi">
-        <div class="label">Vendor Bills</div>
-        <div class="value">{{ data.vendorBillCount || 0 }}</div>
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 text-center">
+        <div class="text-3xl font-bold text-gray-900">{{ data.vendorBillCount || 0 }}</div>
+        <div class="text-sm text-gray-500 mt-1">Vendor Bills</div>
       </div>
     </div>
   </div>
@@ -35,18 +61,6 @@
 const { request } = useApi()
 const { formatMoney } = useMoney()
 const data = ref({})
-const cards = computed(() => [
-  { label: 'Booking Sales', value: data.value.bookingSale },
-  { label: 'Vendor Cost', value: data.value.bookingCost },
-  { label: 'Expected Margin', value: data.value.expectedMargin },
-  { label: 'Invoice Sales', value: data.value.invoiceSales },
-  { label: 'Client Received', value: data.value.clientReceived },
-  { label: 'Vendor Paid', value: data.value.vendorPaid },
-  { label: 'Receivable', value: data.value.receivable },
-  { label: 'Payable', value: data.value.payable },
-])
-
-onMounted(async () => {
-  data.value = await request('/reports/dashboard')
-})
+const fmt = (v) => formatMoney(v || 0)
+onMounted(async () => { data.value = await request('/reports/dashboard') })
 </script>

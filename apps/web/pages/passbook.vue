@@ -71,7 +71,7 @@
               <td>{{ row.description }}</td>
               <td class="muted">{{ row.ref || '—' }}</td>
               <td style="text-align:right" :class="row.debit ? 'money' : 'muted'">{{ row.debit ? fmt(row.debit) : '—' }}</td>
-              <td style="text-align:right" :class="row.credit ? 'money' : 'muted'" style="color:var(--success)">{{ row.credit ? fmt(row.credit) : '—' }}</td>
+              <td style="text-align:right;color:var(--success)" :class="row.credit ? 'money' : 'muted'">{{ row.credit ? fmt(row.credit) : '—' }}</td>
               <td style="text-align:right"><strong :class="row.balance < 0 ? 'danger-text' : ''">{{ fmt(row.balance) }}</strong></td>
             </tr>
             <tr v-if="!data.rows.length"><td colspan="7" class="muted" style="text-align:center;padding:24px;">No transactions found.</td></tr>
