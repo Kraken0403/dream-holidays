@@ -1,0 +1,472 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  ACCOUNTANT
+  SALES
+  VIEWER
+}
+
+enum BookingStatus {
+  DRAFT
+  CONFIRMED
+  PARTIALLY_INVOICED
+  INVOICED
+  PARTIALLY_PAID
+  PAID
+  CLOSED
+  CANCELLED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum VendorBillStatus {
+  PENDING
+  PARTIALLY_PAID
+  PAID
+  DISPUTED
+  CANCELLED
+}
+
+enum JournalSourceType {
+  INVOICE
+  CLIENT_PAYMENT
+  VENDOR_BILL
+  VENDOR_PAYMENT
+  CREDIT_NOTE
+  REFUND
+  MANUAL
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  name         String
+  email        String    @unique
+  passwordHash String
+  role         UserRole  @default(ADMIN)
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  bookings     Booking[] @relation("BookingSalesPerson")
+}
+
+model Company {
+  id                Int                  @id @default(autoincrement())
+  name              String
+  legalName         String?
+  gstNumber         String?
+  panNumber         String?
+  phone             String?
+  email             String?
+  addressLine1      String?
+  addressLine2      String?
+  city              String?
+  state             String?
+  country           String?              @default("India")
+  pincode           String?
+  logoUrl           String?
+  signatureUrl      String?
+  invoicePrefix     String               @default("DH")
+  proformaPrefix    String               @default("PI")
+  creditNotePrefix  String               @default("CN")
+  invoiceTerms      String?              @db.Text
+  active            Boolean              @default(true)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  bankAccounts      CompanyBankAccount[]
+  bookings          Booking[]
+  invoices          Invoice[]
+}
+
+model CompanyBankAccount {
+  id            Int      @id @default(autoincrement())
+  companyId     Int
+  bankName      String
+  accountName   String
+  accountNumber String
+  ifscCode      String?
+  branch        String?
+  isDefault     Boolean  @default(false)
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+model GlobalSetting {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique
+  value       Json
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ServiceCategory {
+  id            Int                     @id @default(autoincrement())
+  name          String
+  slug          String                  @unique
+  parentId      Int?
+  active        Boolean                 @default(true)
+  sortOrder     Int                     @default(0)
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+
+  parent        ServiceCategory?        @relation("CategoryTree", fields: [parentId], references: [id])
+  children      ServiceCategory[]       @relation("CategoryTree")
+  vendorLinks   VendorServiceCategory[]
+  serviceItems  BookingServiceItem[]
+}
+
+model Vendor {
+  id               Int                     @id @default(autoincrement())
+  name             String
+  code             String?                 @unique
+  contactPerson    String?
+  phone            String?
+  email            String?
+  gstNumber        String?
+  panNumber        String?
+  address          String?                 @db.Text
+  bankName         String?
+  accountName      String?
+  accountNumber    String?
+  ifscCode         String?
+  creditDays       Int                     @default(0)
+  openingBalance   Decimal                 @default(0.00) @db.Decimal(15, 2)
+  notes            String?                 @db.Text
+  active           Boolean                 @default(true)
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  categoryLinks    VendorServiceCategory[]
+  serviceItems     BookingServiceItem[]
+  vendorBills      VendorBill[]
+  vendorPayments   VendorPayment[]
+}
+
+model VendorServiceCategory {
+  id         Int             @id @default(autoincrement())
+  vendorId   Int
+  categoryId Int
+  vendor     Vendor          @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  category   ServiceCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([vendorId, categoryId])
+}
+
+model Client {
+  id             Int             @id @default(autoincrement())
+  name           String
+  companyName    String?
+  clientType     String          @default("INDIVIDUAL")
+  phone          String?
+  email          String?
+  gstNumber      String?
+  panNumber      String?
+  billingAddress String?         @db.Text
+  city           String?
+  state          String?
+  country        String?         @default("India")
+  pincode        String?
+  openingBalance Decimal         @default(0.00) @db.Decimal(15, 2)
+  notes          String?         @db.Text
+  active         Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  bookings       Booking[]
+  invoices       Invoice[]
+  payments       ClientPayment[]
+}
+
+model Booking {
+  id                  Int                  @id @default(autoincrement())
+  bookingNumber       String               @unique
+  bookingDate         DateTime             @default(now())
+  clientId            Int
+  companyId           Int
+  salesPersonId       Int?
+  title               String
+  destination         String?
+  travelStartDate     DateTime?
+  travelEndDate       DateTime?
+  passengerCount      Int                  @default(1)
+  status              BookingStatus        @default(DRAFT)
+  internalNotes       String?              @db.Text
+  clientNotes         String?              @db.Text
+  totalSaleAmount     Decimal              @default(0.00) @db.Decimal(15, 2)
+  totalVendorCost     Decimal              @default(0.00) @db.Decimal(15, 2)
+  grossMargin         Decimal              @default(0.00) @db.Decimal(15, 2)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  client              Client               @relation(fields: [clientId], references: [id])
+  company             Company              @relation(fields: [companyId], references: [id])
+  salesPerson         User?                @relation("BookingSalesPerson", fields: [salesPersonId], references: [id])
+  passengers          BookingPassenger[]
+  serviceItems        BookingServiceItem[]
+  invoices            Invoice[]
+  vendorBills         VendorBill[]
+  clientPayments      ClientPayment[]
+  vendorPayments      VendorPayment[]
+}
+
+model BookingPassenger {
+  id          Int      @id @default(autoincrement())
+  bookingId   Int
+  fullName    String
+  phone       String?
+  email       String?
+  passportNo  String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  booking     Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+}
+
+model BookingServiceItem {
+  id                 Int              @id @default(autoincrement())
+  bookingId          Int
+  categoryId         Int
+  vendorId           Int?
+  description        String           @db.Text
+  serviceDate        DateTime?
+  quantity           Decimal          @default(1.00) @db.Decimal(10, 2)
+  saleRate           Decimal          @default(0.00) @db.Decimal(15, 2)
+  saleTax            Decimal          @default(0.00) @db.Decimal(15, 2)
+  saleTotal          Decimal          @default(0.00) @db.Decimal(15, 2)
+  vendorCost         Decimal          @default(0.00) @db.Decimal(15, 2)
+  vendorTax          Decimal          @default(0.00) @db.Decimal(15, 2)
+  vendorTotal        Decimal          @default(0.00) @db.Decimal(15, 2)
+  margin             Decimal          @default(0.00) @db.Decimal(15, 2)
+  status             String           @default("ACTIVE")
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  booking            Booking          @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  category           ServiceCategory  @relation(fields: [categoryId], references: [id])
+  vendor             Vendor?          @relation(fields: [vendorId], references: [id])
+  invoiceItems       InvoiceItem[]
+  vendorBillItems    VendorBillItem[]
+}
+
+model Invoice {
+  id                 Int                       @id @default(autoincrement())
+  invoiceNumber      String                    @unique
+  companyId          Int
+  clientId           Int
+  bookingId          Int?
+  invoiceDate        DateTime                  @default(now())
+  dueDate            DateTime?
+  placeOfSupply      String?
+  status             InvoiceStatus             @default(DRAFT)
+  subtotal           Decimal                   @default(0.00) @db.Decimal(15, 2)
+  taxAmount          Decimal                   @default(0.00) @db.Decimal(15, 2)
+  roundOff           Decimal                   @default(0.00) @db.Decimal(15, 2)
+  grandTotal         Decimal                   @default(0.00) @db.Decimal(15, 2)
+  paidAmount         Decimal                   @default(0.00) @db.Decimal(15, 2)
+  outstandingAmount  Decimal                   @default(0.00) @db.Decimal(15, 2)
+  notes              String?                   @db.Text
+  terms              String?                   @db.Text
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+
+  company            Company                   @relation(fields: [companyId], references: [id])
+  client             Client                    @relation(fields: [clientId], references: [id])
+  booking            Booking?                  @relation(fields: [bookingId], references: [id])
+  items              InvoiceItem[]
+  paymentAllocations ClientPaymentAllocation[]
+}
+
+model InvoiceItem {
+  id                   Int                 @id @default(autoincrement())
+  invoiceId            Int
+  bookingServiceItemId Int?
+  description          String              @db.Text
+  quantity             Decimal             @default(1.00) @db.Decimal(10, 2)
+  rate                 Decimal             @default(0.00) @db.Decimal(15, 2)
+  taxAmount            Decimal             @default(0.00) @db.Decimal(15, 2)
+  total                Decimal             @default(0.00) @db.Decimal(15, 2)
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  invoice              Invoice             @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  bookingServiceItem   BookingServiceItem? @relation(fields: [bookingServiceItemId], references: [id])
+}
+
+model ClientPayment {
+  id              Int                       @id @default(autoincrement())
+  clientId        Int
+  bookingId       Int?
+  paymentDate     DateTime                  @default(now())
+  amount          Decimal                   @db.Decimal(15, 2)
+  paymentMode     String
+  bankAccountId   Int?
+  referenceNumber String?
+  notes           String?                   @db.Text
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  client          Client                    @relation(fields: [clientId], references: [id])
+  booking         Booking?                  @relation(fields: [bookingId], references: [id])
+  allocations     ClientPaymentAllocation[]
+}
+
+model ClientPaymentAllocation {
+  id              Int           @id @default(autoincrement())
+  clientPaymentId Int
+  invoiceId       Int
+  amount          Decimal       @db.Decimal(15, 2)
+  createdAt       DateTime      @default(now())
+
+  clientPayment   ClientPayment @relation(fields: [clientPaymentId], references: [id], onDelete: Cascade)
+  invoice         Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+model VendorBill {
+  id                Int                       @id @default(autoincrement())
+  billNumber        String                    @unique
+  vendorInvoiceNo   String?
+  vendorId          Int
+  bookingId         Int?
+  billDate          DateTime                  @default(now())
+  dueDate           DateTime?
+  status            VendorBillStatus          @default(PENDING)
+  subtotal          Decimal                   @default(0.00) @db.Decimal(15, 2)
+  taxAmount         Decimal                   @default(0.00) @db.Decimal(15, 2)
+  grandTotal        Decimal                   @default(0.00) @db.Decimal(15, 2)
+  paidAmount        Decimal                   @default(0.00) @db.Decimal(15, 2)
+  outstandingAmount Decimal                   @default(0.00) @db.Decimal(15, 2)
+  notes             String?                   @db.Text
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+
+  vendor            Vendor                    @relation(fields: [vendorId], references: [id])
+  booking           Booking?                  @relation(fields: [bookingId], references: [id])
+  items             VendorBillItem[]
+  paymentAllocations VendorPaymentAllocation[]
+}
+
+model VendorBillItem {
+  id                   Int                 @id @default(autoincrement())
+  vendorBillId         Int
+  bookingServiceItemId Int?
+  description          String              @db.Text
+  quantity             Decimal             @default(1.00) @db.Decimal(10, 2)
+  rate                 Decimal             @default(0.00) @db.Decimal(15, 2)
+  taxAmount            Decimal             @default(0.00) @db.Decimal(15, 2)
+  total                Decimal             @default(0.00) @db.Decimal(15, 2)
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  vendorBill           VendorBill          @relation(fields: [vendorBillId], references: [id], onDelete: Cascade)
+  bookingServiceItem   BookingServiceItem? @relation(fields: [bookingServiceItemId], references: [id])
+}
+
+model VendorPayment {
+  id              Int                       @id @default(autoincrement())
+  vendorId        Int
+  bookingId       Int?
+  paymentDate     DateTime                  @default(now())
+  amount          Decimal                   @db.Decimal(15, 2)
+  paymentMode     String
+  bankAccountId   Int?
+  referenceNumber String?
+  notes           String?                   @db.Text
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  vendor          Vendor                    @relation(fields: [vendorId], references: [id])
+  booking         Booking?                  @relation(fields: [bookingId], references: [id])
+  allocations     VendorPaymentAllocation[]
+}
+
+model VendorPaymentAllocation {
+  id              Int           @id @default(autoincrement())
+  vendorPaymentId Int
+  vendorBillId    Int
+  amount          Decimal       @db.Decimal(15, 2)
+  createdAt       DateTime      @default(now())
+
+  vendorPayment   VendorPayment @relation(fields: [vendorPaymentId], references: [id], onDelete: Cascade)
+  vendorBill      VendorBill    @relation(fields: [vendorBillId], references: [id], onDelete: Cascade)
+}
+
+model LedgerAccount {
+  id          Int      @id @default(autoincrement())
+  name        String
+  code        String   @unique
+  type        String
+  refType     String?
+  refId       Int?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  lines       JournalEntryLine[]
+}
+
+model JournalEntry {
+  id          Int               @id @default(autoincrement())
+  entryDate   DateTime          @default(now())
+  sourceType  JournalSourceType @default(MANUAL)
+  sourceId    Int?
+  narration   String            @db.Text
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  lines       JournalEntryLine[]
+}
+
+model JournalEntryLine {
+  id              Int           @id @default(autoincrement())
+  journalEntryId  Int
+  ledgerAccountId Int
+  debit           Decimal       @default(0.00) @db.Decimal(15, 2)
+  credit          Decimal       @default(0.00) @db.Decimal(15, 2)
+  createdAt       DateTime      @default(now())
+
+  journalEntry    JournalEntry  @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  ledgerAccount   LedgerAccount @relation(fields: [ledgerAccountId], references: [id])
+}
+
+model Attachment {
+  id          Int      @id @default(autoincrement())
+  refType     String
+  refId       Int
+  fileName    String
+  fileUrl     String
+  mimeType    String?
+  sizeBytes   Int?
+  createdAt   DateTime @default(now())
+}
+
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  userId      Int?
+  action      String
+  entityType  String
+  entityId    Int?
+  beforeJson  Json?
+  afterJson   Json?
+  createdAt   DateTime @default(now())
+}
