@@ -3,10 +3,10 @@
     :to="to"
     class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
     :class="isActive
-      ? 'bg-blue-600 text-white'
-      : 'text-gray-300 hover:bg-gray-800 hover:text-white'"
+      ? 'bg-blue-50 text-blue-700 font-semibold'
+      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'"
   >
-    <span class="flex-shrink-0 text-current opacity-80">
+    <span class="flex-shrink-0" :class="isActive ? 'text-blue-600' : 'text-gray-400'">
       <slot name="icon" />
     </span>
     <span>{{ label }}</span>

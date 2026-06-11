@@ -1,17 +1,14 @@
 <template>
   <div>
-    <!-- Page header -->
-    <div class="flex items-center justify-between mb-6">
-      <div>
-        <h1 class="text-2xl font-bold text-gray-900">Bookings</h1>
-        <p class="text-sm text-gray-500 mt-1">Trip files — create booking, generate invoice &amp; vendor payables.</p>
-      </div>
-      <button type="button" @click="openCreate"
-        class="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
-        New Booking
-      </button>
-    </div>
+    <PageHeader title="Bookings" subtitle="Trip files — create booking, generate invoice &amp; vendor payables.">
+      <template #actions>
+        <button type="button" @click="openCreate"
+          class="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+          New Booking
+        </button>
+      </template>
+    </PageHeader>
 
     <!-- Table -->
     <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
@@ -31,7 +28,7 @@
             <tr
               v-for="b in bookings" :key="b.id"
               class="hover:bg-blue-50/60 cursor-pointer transition-colors"
-              @click="navigateTo(`/bookings/${b.id}`)"
+              @click="router.push(`/bookings/${b.id}`)"
             >
               <td class="px-4 py-3">
                 <div class="font-semibold text-gray-900">{{ b.bookingNumber }}</div>
@@ -59,7 +56,7 @@
     </div>
 
     <!-- Create Booking Modal -->
-    <AppModal v-model="showModal" title="Create Booking" size="lg">
+    <AppModal v-model="showModal" title="Create Booking" subtitle="Fill in the trip details and service items" size="lg" color="blue">
       <form id="booking-form" @submit.prevent="save">
         <div class="space-y-5">
           <div class="grid grid-cols-2 gap-4">
@@ -198,6 +195,7 @@
 <script setup>
 const { request } = useApi()
 const { formatMoney } = useMoney()
+const router = useRouter()
 const bookings = ref([]), clients = ref([]), companies = ref([]), categories = ref([]), vendors = ref([])
 const showModal = ref(false)
 const saving = ref(false)

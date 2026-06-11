@@ -4,35 +4,33 @@
   </div>
   <div v-else class="flex min-h-screen bg-gray-50">
 
-    <!-- ══════════════════════════════════
-         FIXED SIDEBAR
-    ════════════════════════════════════ -->
+    <!-- FIXED SIDEBAR -->
     <aside
-      class="fixed top-0 left-0 z-40 h-screen w-64 flex flex-col bg-gray-900 border-r border-gray-700 transition-transform duration-300"
+      class="fixed top-0 left-0 z-40 h-screen w-64 flex flex-col bg-white border-r border-gray-200 transition-transform duration-300"
       :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'"
     >
       <!-- Logo -->
-      <div class="flex items-center gap-3 px-5 py-5 border-b border-gray-700">
-        <div class="flex-shrink-0 w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center">
-          <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z"/></svg>
+      <div class="flex items-center gap-3 px-5 py-5 border-b border-gray-200">
+        <div class="flex-shrink-0 w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center shadow-sm">
+          <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z"/>
+          </svg>
         </div>
         <div>
-          <div class="text-white font-bold text-base leading-tight">Dream Holidays</div>
+          <div class="text-gray-900 font-bold text-base leading-tight">Dream Holidays</div>
           <div class="text-gray-400 text-xs">Accounting Suite</div>
         </div>
       </div>
 
       <!-- Nav -->
-      <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+      <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
 
-        <!-- ── Overview ── -->
         <NavGroup label="Overview" :open="groups.overview" @toggle="groups.overview = !groups.overview">
           <NavItem to="/dashboard" label="Dashboard">
             <template #icon><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg></template>
           </NavItem>
         </NavGroup>
 
-        <!-- ── Setup ── -->
         <NavGroup label="Setup" :open="groups.setup" @toggle="groups.setup = !groups.setup">
           <NavItem to="/companies" label="Companies">
             <template #icon><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3.75h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008z"/></svg></template>
@@ -51,7 +49,6 @@
           </NavItem>
         </NavGroup>
 
-        <!-- ── Operations ── -->
         <NavGroup label="Operations" :open="groups.operations" @toggle="groups.operations = !groups.operations">
           <NavItem to="/bookings" label="Bookings">
             <template #icon><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 00.75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 00-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0112 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 01-.673-.38m0 0A2.18 2.18 0 013 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 013.413-.387m7.5 0V5.25A2.25 2.25 0 0013.5 3h-3a2.25 2.25 0 00-2.25 2.25v.894m7.5 0a48.667 48.667 0 00-7.5 0M12 12.75h.008v.008H12v-.008z"/></svg></template>
@@ -64,7 +61,6 @@
           </NavItem>
         </NavGroup>
 
-        <!-- ── Accounting ── -->
         <NavGroup label="Accounting" :open="groups.accounting" @toggle="groups.accounting = !groups.accounting">
           <NavItem to="/passbook" label="Passbook">
             <template #icon><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"/></svg></template>
@@ -83,16 +79,16 @@
       </nav>
 
       <!-- User footer -->
-      <div class="border-t border-gray-700 px-4 py-3 flex items-center justify-between">
+      <div class="border-t border-gray-200 px-4 py-3 flex items-center justify-between bg-gray-50">
         <div class="flex items-center gap-3 min-w-0">
           <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">DH</div>
           <div class="min-w-0">
-            <div class="text-white text-sm font-medium truncate">Admin</div>
+            <div class="text-gray-800 text-sm font-semibold truncate">Admin</div>
             <div class="text-gray-400 text-xs truncate">admin@dreamholidays.local</div>
           </div>
         </div>
-        <button @click="logout" title="Logout" class="text-gray-400 hover:text-white transition-colors flex-shrink-0">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"/></svg>
+        <button @click="logout" title="Logout" class="text-gray-400 hover:text-gray-700 transition-colors flex-shrink-0 p-1.5 rounded-lg hover:bg-gray-200">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"/></svg>
         </button>
       </div>
     </aside>
@@ -100,19 +96,16 @@
     <!-- Sidebar overlay for mobile -->
     <div v-if="sidebarOpen" class="fixed inset-0 z-30 bg-gray-900/50 md:hidden" @click="sidebarOpen = false" />
 
-    <!-- ══════════════════════════════════
-         MAIN CONTENT
-    ════════════════════════════════════ -->
+    <!-- MAIN CONTENT -->
     <div class="flex-1 flex flex-col md:ml-64 min-w-0">
 
       <!-- Top bar -->
-      <header class="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-gray-200 h-16 flex items-center px-6 gap-4">
-        <!-- Mobile hamburger -->
+      <header class="sticky top-0 z-20 bg-white border-b border-gray-200 h-14 flex items-center px-6 gap-4">
         <button class="md:hidden text-gray-500 hover:text-gray-700" @click="sidebarOpen = !sidebarOpen">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>
         </button>
         <div class="flex-1" />
-        <div class="text-sm text-gray-500 hidden sm:block">Dream Holidays · Accounting Suite</div>
+        <span class="text-xs text-gray-400 hidden sm:block tracking-wide uppercase font-medium">Dream Holidays · Accounting</span>
       </header>
 
       <!-- Page content -->

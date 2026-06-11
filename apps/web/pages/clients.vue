@@ -1,15 +1,13 @@
 <template>
   <div>
-    <div class="flex items-center justify-between mb-6">
-      <div>
-        <h1 class="text-2xl font-bold text-gray-900">Clients</h1>
-        <p class="text-sm text-gray-500 mt-1">Customer master — billing contacts and details.</p>
-      </div>
-      <button @click="openCreate" class="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
-        Add Client
-      </button>
-    </div>
+    <PageHeader title="Clients" subtitle="Customer master — billing contacts and details.">
+      <template #actions>
+        <button @click="openCreate" class="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+          Add Client
+        </button>
+      </template>
+    </PageHeader>
 
     <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       <div class="overflow-x-auto">
@@ -38,7 +36,7 @@
       </div>
     </div>
 
-    <AppModal v-model="showModal" :title="editId ? 'Edit Client' : 'Add Client'" size="md">
+    <AppModal v-model="showModal" :title="editId ? 'Edit Client' : 'Add Client'" subtitle="Client billing contact details" size="md" color="blue">
       <form id="client-form" @submit.prevent="save" class="space-y-4">
         <div class="grid grid-cols-2 gap-4">
           <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Name *</label><input v-model="form.name" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required /></div>

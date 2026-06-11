@@ -1,15 +1,13 @@
 <template>
   <div>
-    <div class="flex items-center justify-between mb-6">
-      <div>
-        <h1 class="text-2xl font-bold text-gray-900">Invoices</h1>
-        <p class="text-sm text-gray-500 mt-1">Client billing and payment tracking.</p>
-      </div>
-      <button @click="openCreate" class="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
-        Create Invoice
-      </button>
-    </div>
+    <PageHeader title="Invoices" subtitle="Client billing and payment tracking.">
+      <template #actions>
+        <button @click="openCreate" class="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+          Create Invoice
+        </button>
+      </template>
+    </PageHeader>
 
     <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       <div class="overflow-x-auto">
@@ -50,7 +48,7 @@
     </div>
 
     <!-- Create Invoice Modal -->
-    <AppModal v-model="showCreate" title="Create Invoice" size="lg">
+    <AppModal v-model="showCreate" title="Create Invoice" subtitle="Generate a client invoice from booking or manually" size="lg" color="blue">
       <form id="inv-form" @submit.prevent="saveInvoice" class="space-y-4">
         <div class="grid grid-cols-2 gap-4">
           <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Client *</label><select v-model="form.clientId" :class="INP" required><option value="">Select client</option><option v-for="c in clients" :key="c.id" :value="c.id">{{ c.name }}</option></select></div>
@@ -91,7 +89,7 @@
     </AppModal>
 
     <!-- Payment Modal -->
-    <AppModal v-model="showPayment" title="Record Payment" size="sm">
+    <AppModal v-model="showPayment" title="Record Payment" subtitle="Apply payment to this invoice" size="sm" color="green">
       <form v-if="paymentInvoice" id="pay-form" @submit.prevent="pay" class="space-y-4">
         <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm">
           <div class="font-semibold text-amber-800">{{ paymentInvoice.invoiceNumber }}</div>

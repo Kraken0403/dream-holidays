@@ -1,139 +1,149 @@
 <template>
-  <div class="page">
-    <div class="page-head">
-      <div><h1>Companies</h1><p class="sub">Billing entities from which invoices are issued.</p></div>
-      <button class="btn" type="button" @click="openCreate">+ Add Company</button>
-    </div>
-    <div class="card table-wrap">
-      <table>
-        <thead>
-          <tr><th>Company</th><th>GST / PAN</th><th>Prefix</th><th>Bank Accounts</th><th>Status</th><th></th></tr>
-        </thead>
-        <tbody>
-          <tr v-for="c in companies" :key="c.id">
-            <td>
-              <div style="display:flex;gap:10px;align-items:center;">
-                <div class="logo-preview"><img v-if="c.logoUrl" :src="c.logoUrl" :alt="`${c.name} logo`" /><span v-else>{{ c.name?.charAt(0) }}</span></div>
-                <div>
-                  <strong>{{ c.name }}</strong>
-                  <div class="muted">{{ c.legalName || '' }}</div>
-                  <div class="muted" style="font-size:12px;">{{ c.email || '' }} {{ c.phone ? '· ' + c.phone : '' }}</div>
-                </div>
-              </div>
-            </td>
-            <td>
-              <div>{{ c.gstNumber || '—' }}</div>
-              <div class="muted">{{ c.panNumber || '' }}</div>
-            </td>
-            <td>
-              <span class="badge">{{ c.invoicePrefix }}</span>
-            </td>
-            <td>
-              <div v-if="c.bankAccounts?.length" style="font-size:13px;">
-                <div v-for="b in c.bankAccounts" :key="b.id">{{ b.bankName }} · {{ b.accountNumber }}</div>
-              </div>
-              <span v-else class="muted">—</span>
-            </td>
-            <td><span class="badge" :class="c.active ? '' : 'badge-danger'">{{ c.active ? 'Active' : 'Inactive' }}</span></td>
-            <td>
-              <div class="inline-form">
-                <button class="btn ghost small" type="button" @click="openEdit(c)">Edit</button>
-                <button class="btn ghost small danger" type="button" @click="deactivate(c)">Deactivate</button>
-              </div>
-            </td>
-          </tr>
-          <tr v-if="!companies.length"><td colspan="6" class="muted" style="text-align:center;padding:32px;">No companies found.</td></tr>
-        </tbody>
-      </table>
-    </div>
+  <div>
+    <PageHeader title="Companies" subtitle="Billing entities from which invoices are issued.">
+      <template #actions>
+        <button type="button" @click="openCreate"
+          class="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+          Add Company
+        </button>
+      </template>
+    </PageHeader>
 
-    <div v-if="showModal" class="modal-backdrop" @click.self="showModal = false">
-      <div class="modal">
-        <div class="modal-head">
-          <h2 class="modal-title">{{ editId ? 'Edit Company' : 'Add Company' }}</h2>
-          <button class="btn ghost small" type="button" @click="showModal = false">Close</button>
-        </div>
-        <form class="form" @submit.prevent="save">
-          <div class="modal-body form">
-            <div class="form-row">
-              <div class="field"><label>Name *</label><input v-model="form.name" class="input" required /></div>
-              <div class="field"><label>Legal Name</label><input v-model="form.legalName" class="input" /></div>
-            </div>
-            <div class="form-row">
-              <div class="field"><label>GST Number</label><input v-model="form.gstNumber" class="input" /></div>
-              <div class="field"><label>PAN Number</label><input v-model="form.panNumber" class="input" /></div>
-            </div>
-            <div class="form-row">
-              <div class="field"><label>Email</label><input v-model="form.email" class="input" type="email" /></div>
-              <div class="field"><label>Phone</label><input v-model="form.phone" class="input" /></div>
-            </div>
-            <div class="form-row">
-              <div class="field"><label>Invoice Prefix *</label><input v-model="form.invoicePrefix" class="input" required /></div>
-              <div class="field"><label>Proforma Prefix</label><input v-model="form.proformaPrefix" class="input" /></div>
-            </div>
-            <div class="field"><label>Address</label><textarea v-model="form.addressLine1" class="input" rows="2"></textarea></div>
-            <div class="form-row">
-              <div class="field"><label>City</label><input v-model="form.city" class="input" /></div>
-              <div class="field"><label>State</label><input v-model="form.state" class="input" /></div>
-            </div>
-            <div class="form-row">
-              <div class="field"><label>Country</label><input v-model="form.country" class="input" /></div>
-              <div class="field"><label>Pincode</label><input v-model="form.pincode" class="input" /></div>
-            </div>
-            <div class="field"><label>Invoice Terms</label><textarea v-model="form.invoiceTerms" class="input" rows="2" placeholder="e.g. Payment due within 30 days."></textarea></div>
-            <div class="form-row">
-              <div class="field">
-                <label>Logo</label>
-                <input class="input" type="file" accept="image/*" @change="uploadLogo" />
-                <div class="muted" style="margin-top:6px;">{{ logoStatus }}</div>
-              </div>
-              <div class="field">
-                <label>Preview</label>
-                <div class="logo-preview" style="width:80px;height:80px;"><img v-if="form.logoUrl" :src="form.logoUrl" alt="Logo" /><span v-else>Logo</span></div>
-              </div>
-            </div>
-
-            <!-- Bank Accounts -->
-            <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px;">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-                <strong style="font-size:14px;">Bank Accounts</strong>
-                <button class="btn ghost small" type="button" @click="addBank">+ Add Bank</button>
-              </div>
-              <div v-for="(b, i) in form.bankAccounts" :key="i" class="item-box" style="margin-bottom:10px;">
-                <div class="form-row" style="margin-bottom:8px;">
-                  <div class="field"><label>Bank Name</label><input v-model="b.bankName" class="input" /></div>
-                  <div class="field"><label>Account Name</label><input v-model="b.accountName" class="input" /></div>
-                </div>
-                <div class="form-row" style="margin-bottom:8px;">
-                  <div class="field"><label>Account Number</label><input v-model="b.accountNumber" class="input" /></div>
-                  <div class="field"><label>IFSC Code</label><input v-model="b.ifscCode" class="input" /></div>
-                </div>
-                <div class="form-row">
-                  <div class="field"><label>Branch</label><input v-model="b.branch" class="input" /></div>
-                  <div class="field" style="display:flex;align-items:flex-end;gap:12px;">
-                    <label style="display:flex;gap:8px;align-items:center;cursor:pointer;">
-                      <input type="checkbox" v-model="b.isDefault" @change="setDefault(i)" />
-                      Default
-                    </label>
-                    <button class="btn ghost small danger" type="button" @click="removeBank(i)">Remove</button>
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="bg-gray-50 border-b border-gray-100">
+              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Company</th>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">GST / PAN</th>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Invoice Prefix</th>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Bank Accounts</th>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
+              <th class="px-4 py-3"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-50">
+            <tr v-for="c in companies" :key="c.id" class="hover:bg-gray-50 transition-colors">
+              <td class="px-4 py-3">
+                <div class="flex items-center gap-3">
+                  <div class="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-sm flex-shrink-0 overflow-hidden">
+                    <img v-if="c.logoUrl" :src="c.logoUrl" :alt="`${c.name} logo`" class="w-full h-full object-contain" />
+                    <span v-else>{{ c.name?.charAt(0) }}</span>
+                  </div>
+                  <div>
+                    <div class="font-semibold text-gray-900">{{ c.name }}</div>
+                    <div class="text-xs text-gray-400">{{ c.legalName || '' }}</div>
+                    <div class="text-xs text-gray-400">{{ c.email || '' }}{{ c.phone ? ' · ' + c.phone : '' }}</div>
                   </div>
                 </div>
-              </div>
-              <div v-if="!form.bankAccounts.length" class="muted" style="font-size:13px;">No bank accounts added.</div>
-            </div>
-          </div>
-          <div class="modal-actions">
-            <button class="btn secondary" type="button" @click="showModal = false">Cancel</button>
-            <button class="btn" :disabled="saving">{{ saving ? 'Saving…' : editId ? 'Update Company' : 'Save Company' }}</button>
-          </div>
-        </form>
+              </td>
+              <td class="px-4 py-3">
+                <div class="text-gray-700">{{ c.gstNumber || '—' }}</div>
+                <div class="text-xs text-gray-400">{{ c.panNumber || '' }}</div>
+              </td>
+              <td class="px-4 py-3">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">{{ c.invoicePrefix }}</span>
+              </td>
+              <td class="px-4 py-3">
+                <div v-if="c.bankAccounts?.length" class="text-xs text-gray-600 space-y-0.5">
+                  <div v-for="b in c.bankAccounts" :key="b.id">{{ b.bankName }} · ···{{ String(b.accountNumber || '').slice(-4) }}</div>
+                </div>
+                <span v-else class="text-gray-400 text-xs">—</span>
+              </td>
+              <td class="px-4 py-3">
+                <span :class="c.active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
+                  class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold">
+                  {{ c.active ? 'Active' : 'Inactive' }}
+                </span>
+              </td>
+              <td class="px-4 py-3">
+                <div class="flex items-center gap-2">
+                  <button type="button" @click="openEdit(c)" class="px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 rounded-lg transition-colors">Edit</button>
+                  <button type="button" @click="deactivate(c)" class="px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 hover:bg-red-50 rounded-lg transition-colors">Deactivate</button>
+                </div>
+              </td>
+            </tr>
+            <tr v-if="!companies.length">
+              <td colspan="6" class="px-4 py-10 text-center text-gray-400">No companies found.</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
+
+    <!-- Company Modal -->
+    <AppModal v-model="showModal" :title="editId ? 'Edit Company' : 'Add Company'" subtitle="Configure billing entity details and bank accounts" size="xl" color="blue">
+      <form id="co-form" @submit.prevent="save" class="space-y-5">
+        <div class="grid grid-cols-2 gap-4">
+          <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Name *</label><input v-model="form.name" :class="INP" required /></div>
+          <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Legal Name</label><input v-model="form.legalName" :class="INP" /></div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div><label class="block text-sm font-medium text-gray-700 mb-1.5">GST Number</label><input v-model="form.gstNumber" :class="INP" /></div>
+          <div><label class="block text-sm font-medium text-gray-700 mb-1.5">PAN Number</label><input v-model="form.panNumber" :class="INP" /></div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Email</label><input v-model="form.email" type="email" :class="INP" /></div>
+          <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Phone</label><input v-model="form.phone" :class="INP" /></div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Invoice Prefix *</label><input v-model="form.invoicePrefix" :class="INP" required placeholder="DH" /></div>
+          <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Proforma Prefix</label><input v-model="form.proformaPrefix" :class="INP" placeholder="PI" /></div>
+        </div>
+        <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Address</label><textarea v-model="form.addressLine1" :class="INP" rows="2"></textarea></div>
+        <div class="grid grid-cols-4 gap-3">
+          <div><label class="block text-sm font-medium text-gray-700 mb-1.5">City</label><input v-model="form.city" :class="INP" /></div>
+          <div><label class="block text-sm font-medium text-gray-700 mb-1.5">State</label><input v-model="form.state" :class="INP" /></div>
+          <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Country</label><input v-model="form.country" :class="INP" /></div>
+          <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Pincode</label><input v-model="form.pincode" :class="INP" /></div>
+        </div>
+        <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Invoice Terms</label><textarea v-model="form.invoiceTerms" :class="INP" rows="2" placeholder="e.g. Payment due within 30 days."></textarea></div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">Logo</label>
+          <input type="file" accept="image/*" @change="uploadLogo" :class="INP" />
+          <p class="mt-1 text-xs text-gray-400">{{ logoStatus }}</p>
+        </div>
+
+        <!-- Bank Accounts -->
+        <div class="border-t border-gray-200 pt-5">
+          <div class="flex items-center justify-between mb-4">
+            <h4 class="text-sm font-semibold text-gray-900">Bank Accounts</h4>
+            <button type="button" @click="addBank" class="text-sm text-blue-600 hover:text-blue-700 font-medium">+ Add Bank</button>
+          </div>
+          <div v-for="(b, i) in form.bankAccounts" :key="i" class="bg-gray-50 rounded-lg p-4 border border-gray-200 mb-3">
+            <div class="grid grid-cols-2 gap-3 mb-3">
+              <div><label class="block text-xs font-medium text-gray-600 mb-1">Bank Name</label><input v-model="b.bankName" :class="INP + ' bg-white'" /></div>
+              <div><label class="block text-xs font-medium text-gray-600 mb-1">Account Name</label><input v-model="b.accountName" :class="INP + ' bg-white'" /></div>
+            </div>
+            <div class="grid grid-cols-2 gap-3 mb-3">
+              <div><label class="block text-xs font-medium text-gray-600 mb-1">Account Number</label><input v-model="b.accountNumber" :class="INP + ' bg-white'" /></div>
+              <div><label class="block text-xs font-medium text-gray-600 mb-1">IFSC Code</label><input v-model="b.ifscCode" :class="INP + ' bg-white'" /></div>
+            </div>
+            <div class="flex items-center justify-between">
+              <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+                <input type="checkbox" v-model="b.isDefault" @change="setDefault(i)" class="rounded" />
+                Set as default
+              </label>
+              <button type="button" @click="removeBank(i)" class="text-xs text-red-600 hover:text-red-700 font-medium">Remove</button>
+            </div>
+          </div>
+          <p v-if="!form.bankAccounts.length" class="text-sm text-gray-400">No bank accounts added.</p>
+        </div>
+      </form>
+      <template #footer>
+        <button type="button" @click="showModal = false" class="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg">Cancel</button>
+        <button type="submit" form="co-form" :disabled="saving" class="px-4 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg">
+          {{ saving ? 'Saving…' : editId ? 'Update Company' : 'Save Company' }}
+        </button>
+      </template>
+    </AppModal>
   </div>
 </template>
 
 <script setup>
 const { request } = useApi()
+const INP = 'w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow'
 const companies = ref([])
 const showModal = ref(false)
 const editId = ref(null)
@@ -150,12 +160,9 @@ const blankForm = () => ({
 const form = reactive(blankForm())
 
 function resetForm() { Object.assign(form, blankForm()); logoStatus.value = ''; editId.value = null }
-
 function openCreate() { resetForm(); showModal.value = true }
-
 function openEdit(c) {
-  resetForm()
-  editId.value = c.id
+  resetForm(); editId.value = c.id
   Object.assign(form, {
     name: c.name || '', legalName: c.legalName || '', gstNumber: c.gstNumber || '',
     panNumber: c.panNumber || '', invoicePrefix: c.invoicePrefix || 'DH',
@@ -168,51 +175,28 @@ function openEdit(c) {
   })
   showModal.value = true
 }
-
-function addBank() {
-  form.bankAccounts.push({ bankName: '', accountName: '', accountNumber: '', ifscCode: '', branch: '', isDefault: false })
-}
-
+function addBank() { form.bankAccounts.push({ bankName: '', accountName: '', accountNumber: '', ifscCode: '', branch: '', isDefault: false }) }
 function removeBank(i) { form.bankAccounts.splice(i, 1) }
-
-function setDefault(i) {
-  form.bankAccounts.forEach((b, idx) => { b.isDefault = idx === i })
-}
-
+function setDefault(i) { form.bankAccounts.forEach((b, idx) => { b.isDefault = idx === i }) }
 async function load() { companies.value = await request('/companies') }
-
 async function uploadLogo(event) {
-  const file = event.target.files?.[0]
-  if (!file) return
+  const file = event.target.files?.[0]; if (!file) return
   logoStatus.value = 'Uploading…'
-  const body = new FormData()
-  body.append('file', file)
+  const body = new FormData(); body.append('file', file)
   const uploaded = await request('/uploads/company-logo', { method: 'POST', body })
-  form.logoUrl = uploaded.url
-  logoStatus.value = file.name
+  form.logoUrl = uploaded.url; logoStatus.value = file.name
 }
-
 async function deactivate(c) {
   if (!confirm(`Deactivate "${c.name}"?`)) return
-  await request(`/companies/${c.id}`, { method: 'DELETE' })
-  await load()
+  await request(`/companies/${c.id}`, { method: 'DELETE' }); await load()
 }
-
 async function save() {
   saving.value = true
   try {
-    if (editId.value) {
-      await request(`/companies/${editId.value}`, { method: 'PATCH', body: { ...form } })
-    } else {
-      await request('/companies', { method: 'POST', body: { ...form } })
-    }
-    showModal.value = false
-    resetForm()
-    await load()
-  } finally {
-    saving.value = false
-  }
+    if (editId.value) { await request(`/companies/${editId.value}`, { method: 'PATCH', body: { ...form } }) }
+    else { await request('/companies', { method: 'POST', body: { ...form } }) }
+    showModal.value = false; resetForm(); await load()
+  } finally { saving.value = false }
 }
-
 onMounted(load)
 </script>

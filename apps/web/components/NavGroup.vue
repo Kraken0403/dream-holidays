@@ -1,9 +1,9 @@
 <template>
-  <div>
+  <div class="mb-1">
     <button
       type="button"
       @click="$emit('toggle')"
-      class="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-widest text-gray-400 hover:text-gray-300 transition-colors rounded-lg"
+      class="w-full flex items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase tracking-widest text-gray-400 hover:text-gray-600 transition-colors rounded-lg mt-2"
     >
       <span>{{ label }}</span>
       <svg
