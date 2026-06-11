@@ -22,6 +22,7 @@ button { cursor: pointer; }
 .nav { display: grid; gap: 6px; }
 .nav a { padding: 11px 12px; border-radius: 12px; color: #cbd5e1; font-size: 14px; }
 .nav a.router-link-active, .nav a:hover { background: rgba(37, 99, 235, .22); color: #fff; }
+.nav-section { font-size: 10px; font-weight: 800; letter-spacing: .10em; text-transform: uppercase; color: #475569; padding: 14px 12px 4px; }
 .main { flex: 1; min-width: 0; }
 .topbar { height: 66px; background: rgba(255,255,255,.82); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 26px; position: sticky; top: 0; z-index: 10; }
 .page { padding: 26px; }
@@ -55,6 +56,10 @@ th { color: #334155; background: #f8fafc; font-size: 12px; text-transform: upper
 .input { width: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 11px 12px; background: #fff; outline: none; }
 .input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
 .badge { display: inline-flex; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; background: #dbeafe; color: #1d4ed8; }
+.badge-success { background: #dcfce7; color: #15803d; }
+.badge-warning { background: #fef9c3; color: #a16207; }
+.badge-danger { background: #fee2e2; color: #dc2626; }
+.badge-muted { background: #f1f5f9; color: #64748b; }
 .money { font-weight: 800; }
 .muted { color: var(--muted); }
 .login-shell { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: radial-gradient(circle at top, #dbeafe, #f8fafc 48%, #eef2ff); }

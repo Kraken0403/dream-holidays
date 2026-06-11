@@ -33,9 +33,19 @@ export class CompaniesService {
     });
   }
 
-  update(id: number, body: any) {
-    const { bankAccounts, ...company } = body;
-    return this.prisma.company.update({ where: { id }, data: company, include: { bankAccounts: true } });
+  async update(id: number, body: any) {
+    const { bankAccounts = [], ...company } = body;
+    await this.prisma.company.update({ where: { id }, data: company });
+
+    for (const b of bankAccounts) {
+      if (b.id) {
+        await this.prisma.companyBankAccount.update({ where: { id: b.id }, data: { bankName: b.bankName, accountName: b.accountName, accountNumber: b.accountNumber, ifscCode: b.ifscCode, branch: b.branch, isDefault: b.isDefault } });
+      } else {
+        await this.prisma.companyBankAccount.create({ data: { companyId: id, bankName: b.bankName, accountName: b.accountName, accountNumber: b.accountNumber, ifscCode: b.ifscCode, branch: b.branch, isDefault: b.isDefault ?? false } });
+      }
+    }
+
+    return this.findOne(id);
   }
 
   remove(id: number) {
