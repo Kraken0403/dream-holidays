@@ -72,13 +72,23 @@ async function upsertLedger(code: string, name: string, type: string) {
 }
 
 async function main() {
-  const passwordHash = await bcrypt.hash('Admin@12345', 10);
+  const adminEmail = String(process.env.INITIAL_ADMIN_EMAIL || '').trim().toLowerCase();
+  const adminPassword = String(process.env.INITIAL_ADMIN_PASSWORD || '');
+  const adminName = String(process.env.INITIAL_ADMIN_NAME || 'Dream Holidays Admin').trim();
 
-  await prisma.user.upsert({
-    where: { email: 'admin@dreamholidays.local' },
-    update: { name: 'Dream Holidays Admin', passwordHash, role: UserRole.ADMIN, active: true },
-    create: { name: 'Dream Holidays Admin', email: 'admin@dreamholidays.local', passwordHash, role: UserRole.ADMIN }
-  });
+  if (adminEmail || adminPassword) {
+    if (!adminEmail || adminPassword.length < 8) {
+      throw new Error('Set INITIAL_ADMIN_EMAIL and an INITIAL_ADMIN_PASSWORD of at least 8 characters before seeding.');
+    }
+    const passwordHash = await bcrypt.hash(adminPassword, 10);
+    await prisma.user.upsert({
+      where: { email: adminEmail },
+      update: { name: adminName, passwordHash, role: UserRole.ADMIN, active: true },
+      create: { name: adminName, email: adminEmail, passwordHash, role: UserRole.ADMIN }
+    });
+  } else {
+    console.log('Initial admin skipped; no INITIAL_ADMIN_EMAIL/PASSWORD were supplied.');
+  }
 
   const company = await prisma.company.upsert({
     where: { id: 1 },

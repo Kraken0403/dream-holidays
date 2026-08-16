@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { JournalSourceType, VendorBillStatus } from '@prisma/client';
 import { money, sum } from '../../common/number';
+import { dateRangeWhere, readDateRange } from '../../common/date-range';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
@@ -21,9 +22,19 @@ export class VendorPayablesService {
 
   findAll(query: any) {
     const where: any = {};
+    const dateRange = dateRangeWhere(readDateRange(query));
     if (query.status) where.status = query.status;
     if (query.vendorId) where.vendorId = Number(query.vendorId);
     if (query.bookingId) where.bookingId = Number(query.bookingId);
+    if (dateRange) where.billDate = dateRange;
+    if (query.search) {
+      where.OR = [
+        { billNumber: { contains: query.search } },
+        { vendorInvoiceNo: { contains: query.search } },
+        { vendor: { name: { contains: query.search } } },
+        { booking: { bookingNumber: { contains: query.search } } },
+      ];
+    }
     return this.prisma.vendorBill.findMany({
       where,
       include: { vendor: true, booking: true, items: true },
@@ -46,7 +57,7 @@ export class VendorPayablesService {
       quantity: money(item.quantity || 1),
       rate: money(item.rate),
       taxAmount: money(item.taxAmount),
-      total: item.total === undefined ? money(money(item.quantity || 1) * money(item.rate) + money(item.taxAmount)) : money(item.total),
+      total: money(money(item.quantity || 1) * money(item.rate) + money(item.taxAmount)),
     }));
     if (!items.length) throw new BadRequestException('At least one vendor bill item is required.');
 
@@ -81,8 +92,16 @@ export class VendorPayablesService {
     if (!booking) throw new NotFoundException('Booking not found.');
 
     const itemsByVendor = new Map<number, any[]>();
+    const existingItems = await this.prisma.vendorBillItem.findMany({
+      where: {
+        bookingServiceItemId: { in: booking.serviceItems.map((item) => item.id) },
+        vendorBill: { status: { not: VendorBillStatus.CANCELLED } },
+      },
+      select: { bookingServiceItemId: true },
+    });
+    const billedIds = new Set(existingItems.map((item) => item.bookingServiceItemId));
     for (const item of booking.serviceItems) {
-      if (!item.vendorId || Number(item.vendorTotal) <= 0) continue;
+      if (!item.vendorId || Number(item.vendorTotal) <= 0 || billedIds.has(item.id)) continue;
       const list = itemsByVendor.get(item.vendorId) || [];
       list.push(item);
       itemsByVendor.set(item.vendorId, list);
@@ -124,11 +143,39 @@ export class VendorPayablesService {
     });
   }
 
+  async generateFromBookings(bookingIds: unknown) {
+    const ids = [...new Set((Array.isArray(bookingIds) ? bookingIds : []).map(Number).filter((id) => Number.isInteger(id) && id > 0))];
+    if (!ids.length) throw new BadRequestException('Select at least one booking.');
+
+    const results: Array<{ bookingId: number; success: boolean; createdCount: number; message?: string }> = [];
+    for (const bookingId of ids) {
+      try {
+        const created = await this.generateFromBooking(bookingId);
+        results.push({ bookingId, success: true, createdCount: created.length });
+      } catch (error: any) {
+        results.push({ bookingId, success: false, createdCount: 0, message: error?.message || 'Unable to generate vendor payables.' });
+      }
+    }
+
+    return {
+      successCount: results.filter((result) => result.success).length,
+      failedCount: results.filter((result) => !result.success).length,
+      createdCount: results.reduce((total, result) => total + result.createdCount, 0),
+      results,
+    };
+  }
+
   async recordPayment(vendorBillId: number, body: any) {
     const bill = await this.prisma.vendorBill.findUnique({ where: { id: vendorBillId } });
     if (!bill) throw new NotFoundException('Vendor bill not found.');
     const amount = money(body.amount);
     if (amount <= 0) throw new BadRequestException('Payment amount must be greater than zero.');
+    if (bill.status === VendorBillStatus.CANCELLED || bill.status === VendorBillStatus.PAID) {
+      throw new BadRequestException('This vendor bill cannot accept another payment.');
+    }
+    if (amount > money(bill.outstandingAmount)) {
+      throw new BadRequestException('Payment cannot exceed the vendor bill outstanding amount.');
+    }
 
     return this.prisma.$transaction(async (tx) => {
       const payment = await tx.vendorPayment.create({

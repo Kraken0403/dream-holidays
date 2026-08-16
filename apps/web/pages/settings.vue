@@ -1,6 +1,7 @@
 <template>
   <div>
     <PageHeader title="Global Settings" subtitle="Invoice, payment and accounting defaults." />
+    <SettingsTabs />
 
     <div class="max-w-2xl">
       <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
@@ -48,10 +49,16 @@
 
 <script setup>
 const { request } = useApi()
+const toast = useToast()
 const INP = 'w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500 outline-none transition-shadow'
 const form = reactive({ financialYearStartMonth: 4, defaultCurrency: 'INR', invoiceNumberFormat: '{PREFIX}/{FY}/{NUMBER}', defaultDueDays: 7, paymentModes: [] })
 const paymentModesText = ref('')
 async function load() { const data = await request('/settings'); Object.assign(form, data); paymentModesText.value = (data.paymentModes || []).join(', ') }
-async function save() { form.paymentModes = paymentModesText.value.split(',').map(x => x.trim()).filter(Boolean); await request('/settings', { method: 'PUT', body: form }); await load() }
+async function save() {
+  form.paymentModes = paymentModesText.value.split(',').map(x => x.trim()).filter(Boolean)
+  await request('/settings', { method: 'PUT', body: form })
+  await load()
+  toast.success('Settings updated.')
+}
 onMounted(load)
 </script>

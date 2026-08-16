@@ -52,7 +52,7 @@
             </div>
 
             <!-- Footer -->
-            <div v-if="$slots.footer" class="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-xl flex-shrink-0">
+            <div v-if="$slots.footer" class="flex flex-wrap items-center justify-end gap-3 rounded-b-xl border-t px-6 py-4 flex-shrink-0" :class="footerClass">
               <slot name="footer" />
             </div>
           </div>
@@ -69,6 +69,8 @@ const props = defineProps({
   subtitle: { type: String, default: '' },
   size: { type: String, default: 'md' },
   color: { type: String, default: '' }, // blue | indigo | green | amber | rose | ''
+  headerTone: { type: String, default: '' },
+  footerTone: { type: String, default: '' },
 })
 defineEmits(['update:modelValue'])
 
@@ -89,6 +91,12 @@ const headerClass = computed(() => {
     rose:   'bg-gradient-to-r from-rose-600 to-pink-600',
     violet: 'bg-gradient-to-r from-violet-600 to-purple-700',
   }
-  return props.color ? map[props.color] || map.blue : 'border-b border-gray-100'
+  if (props.color) return map[props.color] || map.blue
+  if (props.headerTone === 'soft-blue') return 'border-b border-blue-100 bg-blue-50/70'
+  return 'border-b border-gray-100'
 })
+
+const footerClass = computed(() => props.footerTone === 'soft-blue'
+  ? 'border-blue-100 bg-blue-50/70'
+  : 'border-gray-100 bg-gray-50')
 </script>

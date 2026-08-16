@@ -6,6 +6,9 @@ dist
 .nuxt
 .output
 coverage
+.logs
 .DS_Store
 uploads/*
 !uploads/.gitkeep
+apps/api/uploads/*
+!apps/api/uploads/.gitkeep

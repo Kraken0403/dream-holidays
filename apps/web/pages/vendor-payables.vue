@@ -11,10 +11,56 @@
     </PageHeader>
 
     <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <TableControls
+        v-model:search="billTable.search.value"
+        v-model:page="billTable.page.value"
+        v-model:page-size="billTable.pageSize.value"
+        :page-size-options="billTable.pageSizeOptions"
+        :total="billTable.total.value"
+        :filtered="billTable.filtered.value"
+        :start="billTable.start.value"
+        :end="billTable.end.value"
+        exportable
+        :selected-count="billSelection.selectedCount.value"
+        :filter-count="[billFilters.status, billFilters.vendorId, billFilters.bookingId, billFilters.from, billFilters.to].filter(Boolean).length"
+        search-placeholder="Search bills, vendors, bookings..."
+        @export="billSelection.exportXls"
+        @clear-selection="billSelection.clear"
+      >
+        <template #filters>
+          <div class="w-full sm:w-44">
+            <label class="block text-xs font-medium text-gray-600 mb-1.5">Status</label>
+            <select v-model="billFilters.status" :class="INP">
+              <option value="">All</option>
+              <option v-for="status in billStatuses" :key="status" :value="status">{{ status }}</option>
+            </select>
+          </div>
+          <div class="w-full sm:w-56">
+            <label class="block text-xs font-medium text-gray-600 mb-1.5">Vendor</label>
+            <select v-model="billFilters.vendorId" :class="INP">
+              <option value="">All</option>
+              <option v-for="v in vendors" :key="v.id" :value="v.id">{{ v.name }}</option>
+            </select>
+          </div>
+          <div class="w-full sm:w-56">
+            <label class="block text-xs font-medium text-gray-600 mb-1.5">Booking</label>
+            <select v-model="billFilters.bookingId" :class="INP">
+              <option value="">All</option>
+              <option v-for="b in bookings" :key="b.id" :value="b.id">{{ b.bookingNumber }}</option>
+            </select>
+          </div>
+          <DateRangeFilter
+            v-model:preset="billFilters.period"
+            v-model:from="billFilters.from"
+            v-model:to="billFilters.to"
+          />
+        </template>
+      </TableControls>
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead>
             <tr class="bg-gray-50 border-b border-gray-100">
+              <th class="w-10 px-3 py-3"><input type="checkbox" aria-label="Select page" :checked="billSelection.pageAllSelected.value" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" @change="billSelection.togglePage" /></th>
               <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Bill</th>
               <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Vendor</th>
               <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Booking</th>
@@ -25,7 +71,8 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-50">
-            <tr v-for="b in bills" :key="b.id" class="hover:bg-gray-50 transition-colors">
+            <tr v-for="b in billTable.rows.value" :key="b.id" class="hover:bg-gray-50 transition-colors">
+              <td class="w-10 px-3 py-3"><input type="checkbox" :aria-label="`Select ${b.billNumber}`" :checked="billSelection.isSelected(b)" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" @change="billSelection.toggle(b)" /></td>
               <td class="px-4 py-3">
                 <div class="font-semibold text-gray-900">{{ b.billNumber }}</div>
                 <span :class="statusBadge(b.status)" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-1">{{ b.status }}</span>
@@ -42,8 +89,8 @@
                 </button>
               </td>
             </tr>
-            <tr v-if="!bills.length">
-              <td colspan="7" class="px-4 py-10 text-center text-gray-400">No vendor bills found.</td>
+            <tr v-if="!billTable.filtered.value">
+              <td colspan="8" class="px-4 py-10 text-center text-gray-400">No vendor bills found.</td>
             </tr>
           </tbody>
         </table>
@@ -143,24 +190,46 @@
 
 <script setup>
 const { request } = useApi()
+const toast = useToast()
 const { formatMoney } = useMoney()
+const { formatDate, todayInput } = useDateTime()
 const INP = 'w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow'
 const bills = ref([]), vendors = ref([]), bookings = ref([])
+const billStatuses = ['PENDING', 'PARTIALLY_PAID', 'PAID', 'DISPUTED', 'CANCELLED']
+const billFilters = reactive({ status: '', vendorId: '', bookingId: '', period: 'all', from: '', to: '' })
 const showCreate = ref(false)
 const showPayment = ref(false)
 const paymentBill = ref(null)
-const today = () => new Date().toISOString().slice(0, 10)
+const today = todayInput
 const blankItem = () => ({ description: '', quantity: 1, rate: 0, taxAmount: 0 })
 const blankForm = () => ({ vendorId: '', bookingId: '', vendorInvoiceNo: '', billDate: today(), dueDate: '', notes: '', items: [blankItem()] })
 const form = reactive(blankForm())
 const payment = reactive({ amount: '', paymentMode: 'Bank Transfer' })
 const fmt = (v) => formatMoney(v)
+const filteredBills = computed(() => bills.value.filter((bill) => {
+  if (billFilters.status && bill.status !== billFilters.status) return false
+  if (billFilters.vendorId && Number(bill.vendorId) !== Number(billFilters.vendorId)) return false
+  if (billFilters.bookingId && Number(bill.bookingId) !== Number(billFilters.bookingId)) return false
+  const date = String(bill.billDate || '').slice(0, 10)
+  if (billFilters.from && date < billFilters.from) return false
+  if (billFilters.to && date > billFilters.to) return false
+  return true
+}))
+const billTable = useTableControls(filteredBills, {
+  searchFields: ['billNumber', 'vendorInvoiceNo', 'status', 'vendor.name', 'booking.bookingNumber', 'booking.title'],
+})
+const billSelection = useListingSelection(billTable, [
+  { label: 'Bill', field: 'billNumber' }, { label: 'Vendor Invoice', field: 'vendorInvoiceNo' }, { label: 'Vendor', field: 'vendor.name' },
+  { label: 'Booking', field: 'booking.bookingNumber' }, { label: 'Bill Date', field: (row) => formatDate(row.billDate) },
+  { label: 'Due Date', field: (row) => formatDate(row.dueDate) }, { label: 'Status', field: 'status' },
+  { label: 'Total', field: (row) => fmt(row.grandTotal) }, { label: 'Paid', field: (row) => fmt(row.paidAmount) }, { label: 'Outstanding', field: (row) => fmt(row.outstandingAmount) },
+], 'vendor-payables')
 function itemTotal(item) { return Number(item.quantity || 1) * Number(item.rate || 0) + Number(item.taxAmount || 0) }
 function openCreate() { Object.assign(form, blankForm()); showCreate.value = true }
 function openPayment(bill) { paymentBill.value = bill; Object.assign(payment, { amount: Number(bill.outstandingAmount || 0), paymentMode: 'Bank Transfer' }); showPayment.value = true }
 function addBillItem() { form.items.push(blankItem()) }
 function statusBadge(s) {
-  return { DRAFT: 'bg-gray-100 text-gray-700', PARTIALLY_PAID: 'bg-yellow-100 text-yellow-700', PAID: 'bg-green-100 text-green-700', OVERDUE: 'bg-red-100 text-red-700' }[s] || 'bg-gray-100 text-gray-600'
+  return { PENDING: 'bg-amber-100 text-amber-700', PARTIALLY_PAID: 'bg-yellow-100 text-yellow-700', PAID: 'bg-green-100 text-green-700', DISPUTED: 'bg-red-100 text-red-700', CANCELLED: 'bg-gray-100 text-gray-600' }[s] || 'bg-gray-100 text-gray-600'
 }
 async function load() {
   [bills.value, vendors.value, bookings.value] = await Promise.all([
@@ -173,11 +242,13 @@ async function saveBill() {
   payload.items = payload.items.map(item => ({ ...item, total: itemTotal(item) }))
   await request('/vendor-payables', { method: 'POST', body: payload })
   showCreate.value = false; await load()
+  toast.success('Vendor bill created.')
 }
 async function pay() {
   if (!paymentBill.value) return
   await request(`/vendor-payables/${paymentBill.value.id}/payments`, { method: 'POST', body: payment })
   showPayment.value = false; paymentBill.value = null; await load()
+  toast.success('Vendor payment recorded.')
 }
 onMounted(load)
 </script>

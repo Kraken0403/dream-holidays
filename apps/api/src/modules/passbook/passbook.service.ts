@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { beforeDateWhere, dateRangeWhere, readDateRange } from '../../common/date-range';
 
 function n(v: any) { return Number(v || 0); }
 
@@ -11,9 +12,14 @@ export class PassbookService {
     const client = await this.prisma.client.findUnique({ where: { id: clientId } });
     if (!client) throw new NotFoundException('Client not found.');
 
-    const from = query.from ? new Date(query.from) : undefined;
-    const to = query.to ? new Date(query.to + 'T23:59:59') : undefined;
-    const dateFilter = (field: string) => from || to ? { [field]: { ...(from && { gte: from }), ...(to && { lte: to }) } } : {};
+    const range = readDateRange(query);
+    const dates = dateRangeWhere(range);
+    const dateFilter = (field: string) => dates ? { [field]: dates } : {};
+
+    const [priorInvoices, priorPayments] = range.from ? await Promise.all([
+      this.prisma.invoice.findMany({ where: { clientId, status: { not: 'CANCELLED' }, invoiceDate: beforeDateWhere(range.from) }, select: { grandTotal: true } }),
+      this.prisma.clientPayment.findMany({ where: { clientId, paymentDate: beforeDateWhere(range.from) }, select: { amount: true } }),
+    ]) : [[], []];
 
     const [invoices, payments] = await Promise.all([
       this.prisma.invoice.findMany({
@@ -36,19 +42,21 @@ export class PassbookService {
     }
     entries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    const filtered = query.type === 'debit' ? entries.filter(e => e.debit > 0) : query.type === 'credit' ? entries.filter(e => e.credit > 0) : entries;
-
-    let balance = n(client.openingBalance);
-    const rows = filtered.map(e => {
+    const openingBalance = n(client.openingBalance)
+      + priorInvoices.reduce((sum, invoice) => sum + n(invoice.grandTotal), 0)
+      - priorPayments.reduce((sum, payment) => sum + n(payment.amount), 0);
+    let balance = openingBalance;
+    const allRows = entries.map(e => {
       balance = balance + e.debit - e.credit;
       return { ...e, balance };
     });
+    const rows = query.type === 'debit' ? allRows.filter(e => e.debit > 0) : query.type === 'credit' ? allRows.filter(e => e.credit > 0) : allRows;
 
     return {
       entity: { id: client.id, name: client.name, companyName: client.companyName, phone: client.phone, email: client.email },
-      openingBalance: n(client.openingBalance),
-      totalDebit: filtered.reduce((s, e) => s + e.debit, 0),
-      totalCredit: filtered.reduce((s, e) => s + e.credit, 0),
+      openingBalance,
+      totalDebit: rows.reduce((s, e) => s + e.debit, 0),
+      totalCredit: rows.reduce((s, e) => s + e.credit, 0),
       closingBalance: balance,
       rows,
     };
@@ -58,9 +66,14 @@ export class PassbookService {
     const vendor = await this.prisma.vendor.findUnique({ where: { id: vendorId } });
     if (!vendor) throw new NotFoundException('Vendor not found.');
 
-    const from = query.from ? new Date(query.from) : undefined;
-    const to = query.to ? new Date(query.to + 'T23:59:59') : undefined;
-    const dateFilter = (field: string) => from || to ? { [field]: { ...(from && { gte: from }), ...(to && { lte: to }) } } : {};
+    const range = readDateRange(query);
+    const dates = dateRangeWhere(range);
+    const dateFilter = (field: string) => dates ? { [field]: dates } : {};
+
+    const [priorBills, priorPayments] = range.from ? await Promise.all([
+      this.prisma.vendorBill.findMany({ where: { vendorId, status: { not: 'CANCELLED' }, billDate: beforeDateWhere(range.from) }, select: { grandTotal: true } }),
+      this.prisma.vendorPayment.findMany({ where: { vendorId, paymentDate: beforeDateWhere(range.from) }, select: { amount: true } }),
+    ]) : [[], []];
 
     const [bills, payments] = await Promise.all([
       this.prisma.vendorBill.findMany({
@@ -83,19 +96,21 @@ export class PassbookService {
     }
     entries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    const filtered = query.type === 'debit' ? entries.filter(e => e.debit > 0) : query.type === 'credit' ? entries.filter(e => e.credit > 0) : entries;
-
-    let balance = n(vendor.openingBalance);
-    const rows = filtered.map(e => {
+    const openingBalance = n(vendor.openingBalance)
+      + priorBills.reduce((sum, bill) => sum + n(bill.grandTotal), 0)
+      - priorPayments.reduce((sum, payment) => sum + n(payment.amount), 0);
+    let balance = openingBalance;
+    const allRows = entries.map(e => {
       balance = balance + e.debit - e.credit;
       return { ...e, balance };
     });
+    const rows = query.type === 'debit' ? allRows.filter(e => e.debit > 0) : query.type === 'credit' ? allRows.filter(e => e.credit > 0) : allRows;
 
     return {
       entity: { id: vendor.id, name: vendor.name, phone: vendor.phone, email: vendor.email },
-      openingBalance: n(vendor.openingBalance),
-      totalDebit: filtered.reduce((s, e) => s + e.debit, 0),
-      totalCredit: filtered.reduce((s, e) => s + e.credit, 0),
+      openingBalance,
+      totalDebit: rows.reduce((s, e) => s + e.debit, 0),
+      totalCredit: rows.reduce((s, e) => s + e.credit, 0),
       closingBalance: balance,
       rows,
     };

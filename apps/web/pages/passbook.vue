@@ -31,14 +31,12 @@
             <option v-for="e in entities" :key="e.id" :value="e.id">{{ e.name }}{{ e.companyName ? ' (' + e.companyName + ')' : '' }}</option>
           </select>
         </div>
-        <div>
-          <label class="block text-xs font-medium text-gray-600 mb-1.5">From</label>
-          <input v-model="filters.from" type="date" :class="INP" @change="load" />
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-gray-600 mb-1.5">To</label>
-          <input v-model="filters.to" type="date" :class="INP" @change="load" />
-        </div>
+        <DateRangeFilter
+          v-model:preset="filters.period"
+          v-model:from="filters.from"
+          v-model:to="filters.to"
+          @change="load"
+        />
         <div>
           <label class="block text-xs font-medium text-gray-600 mb-1.5">Type</label>
           <select v-model="filters.type" :class="INP" @change="load">
@@ -85,6 +83,17 @@
 
       <!-- Ledger table -->
       <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <TableControls
+          v-model:search="passbookTable.search.value"
+          v-model:page="passbookTable.page.value"
+          v-model:page-size="passbookTable.pageSize.value"
+          :page-size-options="passbookTable.pageSizeOptions"
+          :total="passbookTable.total.value"
+          :filtered="passbookTable.filtered.value"
+          :start="passbookTable.start.value"
+          :end="passbookTable.end.value"
+          search-placeholder="Search transactions, refs..."
+        />
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
@@ -103,7 +112,7 @@
                 <td colspan="6" class="px-4 py-2.5 text-xs text-gray-500 italic">Opening Balance</td>
                 <td class="px-4 py-2.5 text-right font-semibold text-gray-800 tabular-nums">{{ fmt(data.openingBalance) }}</td>
               </tr>
-              <tr v-for="row in data.rows" :key="row.id + row.type" class="hover:bg-gray-50 transition-colors">
+              <tr v-for="row in passbookTable.rows.value" :key="row.id + row.type" class="hover:bg-gray-50 transition-colors">
                 <td class="px-4 py-3 text-gray-600 whitespace-nowrap">{{ fmtDate(row.date) }}</td>
                 <td class="px-4 py-3">
                   <span :class="row.type === 'INVOICE' || row.type === 'BILL' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'"
@@ -115,7 +124,7 @@
                 <td class="px-4 py-3 text-right tabular-nums font-medium" :class="row.credit ? 'text-green-600' : 'text-gray-300'">{{ row.credit ? fmt(row.credit) : '—' }}</td>
                 <td class="px-4 py-3 text-right tabular-nums font-bold" :class="row.balance < 0 ? 'text-red-600' : 'text-gray-900'">{{ fmt(row.balance) }}</td>
               </tr>
-              <tr v-if="!data.rows.length">
+              <tr v-if="!passbookTable.filtered.value">
                 <td colspan="7" class="px-4 py-10 text-center text-gray-400">No transactions found for the selected filters.</td>
               </tr>
             </tbody>
@@ -128,6 +137,8 @@
 
 <script setup>
 const { request } = useApi()
+const { formatDate } = useDateTime()
+const toast = useToast()
 const { formatMoney } = useMoney()
 const INP = 'w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none'
 const tab = ref('client')
@@ -135,10 +146,14 @@ const selectedId = ref('')
 const entities = ref([])
 const data = ref(null)
 const loading = ref(false)
-const filters = reactive({ from: '', to: '', type: '' })
+const filters = reactive({ period: 'all', from: '', to: '', type: '' })
+const ledgerRows = computed(() => data.value?.rows || [])
+const passbookTable = useTableControls(ledgerRows, {
+  searchFields: ['type', 'description', 'ref', (row) => fmtDate(row.date)],
+})
 
 const fmt = (v) => formatMoney(v)
-const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
+const fmtDate = formatDate
 
 function reset() { selectedId.value = ''; data.value = null }
 
@@ -167,7 +182,7 @@ async function load() {
 
 function exportCsv() {
   if (!data.value) return
-  const rows = data.value.rows
+  const rows = passbookTable.filteredRows.value
   const header = ['Date', 'Type', 'Description', 'Ref', 'Debit', 'Credit', 'Balance']
   const lines = [header.join(','), ...rows.map(r => [fmtDate(r.date), r.type, `"${r.description}"`, r.ref || '', r.debit || '', r.credit || '', r.balance].join(','))]
   const blob = new Blob([lines.join('\n')], { type: 'text/csv' })
@@ -175,6 +190,7 @@ function exportCsv() {
   a.href = URL.createObjectURL(blob)
   a.download = `passbook-${tab.value}-${selectedId.value}-${Date.now()}.csv`
   a.click()
+  toast.success('CSV export started.')
 }
 
 watch(tab, () => { loadEntities(); reset() })

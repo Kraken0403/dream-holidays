@@ -10,6 +10,11 @@ export class VendorPayablesController {
   @Get()
   findAll(@Query() query: any) { return this.service.findAll(query); }
 
+  @Post('from-bookings')
+  generateFromBookings(@Body() body: any) {
+    return this.service.generateFromBookings(body.bookingIds);
+  }
+
   @Post('from-booking/:bookingId')
   generateFromBooking(@Param('bookingId') bookingId: string) {
     return this.service.generateFromBooking(Number(bookingId));

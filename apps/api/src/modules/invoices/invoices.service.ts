@@ -1,7 +1,10 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { BookingStatus, InvoiceStatus, JournalSourceType } from '@prisma/client';
 import { money, sum } from '../../common/number';
+import { dateRangeWhere, readDateRange } from '../../common/date-range';
 import { PrismaService } from '../../prisma/prisma.service';
+
+const DEFAULT_TRAVEL_SERVICE_HSN_SAC = '9985';
 
 @Injectable()
 export class InvoicesService {
@@ -23,9 +26,19 @@ export class InvoicesService {
 
   findAll(query: any) {
     const where: any = {};
+    const dateRange = dateRangeWhere(readDateRange(query));
     if (query.status) where.status = query.status;
     if (query.clientId) where.clientId = Number(query.clientId);
     if (query.companyId) where.companyId = Number(query.companyId);
+    if (dateRange) where.invoiceDate = dateRange;
+    if (query.search) {
+      where.OR = [
+        { invoiceNumber: { contains: query.search } },
+        { client: { name: { contains: query.search } } },
+        { client: { companyName: { contains: query.search } } },
+        { booking: { bookingNumber: { contains: query.search } } },
+      ];
+    }
     return this.prisma.invoice.findMany({
       where,
       include: { client: true, company: true, booking: true, items: true },
@@ -36,7 +49,20 @@ export class InvoicesService {
   async findOne(id: number) {
     const invoice = await this.prisma.invoice.findUnique({
       where: { id },
-      include: { client: true, company: true, booking: true, items: true, paymentAllocations: { include: { clientPayment: true } } },
+      include: {
+        client: true,
+        company: {
+          include: {
+            bankAccounts: {
+              where: { active: true },
+              orderBy: [{ isDefault: 'desc' }, { id: 'asc' }],
+            },
+          },
+        },
+        booking: true,
+        items: { orderBy: { id: 'asc' } },
+        paymentAllocations: { include: { clientPayment: true } },
+      },
     });
     if (!invoice) throw new NotFoundException('Invoice not found.');
     return invoice;
@@ -44,34 +70,65 @@ export class InvoicesService {
 
   async createManual(body: any) {
     const items = (body.items || []).map((item: any) => ({
+      hsnSac: item.hsnSac || body.hsnSac || DEFAULT_TRAVEL_SERVICE_HSN_SAC,
       description: item.description,
       quantity: money(item.quantity || 1),
       rate: money(item.rate),
       taxAmount: money(item.taxAmount),
-      total: item.total === undefined ? money(money(item.quantity || 1) * money(item.rate) + money(item.taxAmount)) : money(item.total),
+      total: money(money(item.quantity || 1) * money(item.rate) + money(item.taxAmount)),
     }));
     if (!items.length) throw new BadRequestException('At least one invoice item is required.');
 
     const totals = this.calcInvoiceTotals(items);
     const invoiceNumber = body.invoiceNumber || (await this.nextInvoiceNumber(Number(body.companyId)));
 
-    return this.prisma.invoice.create({
-      data: {
-        invoiceNumber,
-        companyId: Number(body.companyId),
-        clientId: Number(body.clientId),
-        bookingId: body.bookingId ? Number(body.bookingId) : null,
-        invoiceDate: body.invoiceDate ? new Date(body.invoiceDate) : new Date(),
-        dueDate: body.dueDate ? new Date(body.dueDate) : null,
-        placeOfSupply: body.placeOfSupply,
-        status: body.status || InvoiceStatus.SENT,
-        notes: body.notes,
-        terms: body.terms,
-        ...totals,
-        items: { create: items },
-      },
-      include: { client: true, company: true, items: true },
+    return this.prisma.$transaction(async (tx) => {
+      const invoice = await tx.invoice.create({
+        data: {
+          invoiceNumber,
+          companyId: Number(body.companyId),
+          clientId: Number(body.clientId),
+          bookingId: body.bookingId ? Number(body.bookingId) : null,
+          invoiceDate: body.invoiceDate ? new Date(body.invoiceDate) : new Date(),
+          dueDate: body.dueDate ? new Date(body.dueDate) : null,
+          placeOfSupply: body.placeOfSupply,
+          status: body.status || InvoiceStatus.SENT,
+          notes: body.notes,
+          terms: body.terms,
+          ...totals,
+          items: { create: items },
+        },
+      });
+      await this.createJournalForInvoice(tx, invoice.id, Number(invoice.grandTotal));
+      return tx.invoice.findUnique({
+        where: { id: invoice.id },
+        include: { client: true, company: true, items: true },
+      });
     });
+  }
+
+  async previewFromBooking(bookingId: number) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { serviceItems: true, client: true, company: true },
+    });
+    if (!booking) throw new NotFoundException('Booking not found.');
+
+    const invoicedItems = await this.prisma.invoiceItem.findMany({
+      where: {
+        bookingServiceItemId: { in: booking.serviceItems.map((item) => item.id) },
+        invoice: { status: { not: InvoiceStatus.CANCELLED } },
+      },
+      select: { bookingServiceItemId: true },
+    });
+    const invoicedIds = new Set(invoicedItems.map((item) => item.bookingServiceItemId));
+    const serviceItems = booking.serviceItems.filter((item) => !invoicedIds.has(item.id));
+
+    return {
+      ...booking,
+      serviceItems,
+      unavailableItemCount: booking.serviceItems.length - serviceItems.length,
+    };
   }
 
   async createFromBooking(bookingId: number, body: any) {
@@ -81,20 +138,38 @@ export class InvoicesService {
     });
     if (!booking) throw new NotFoundException('Booking not found.');
 
-    const selectedIds = Array.isArray(body.serviceItemIds) ? body.serviceItemIds.map(Number) : [];
-    const sourceItems = selectedIds.length
+    const suppliedItems = Array.isArray(body.items) ? body.items : [];
+    const suppliedIds = suppliedItems.map((item: any) => Number(item.bookingServiceItemId)).filter(Boolean);
+    const selectedIds = Array.isArray(body.serviceItemIds) ? body.serviceItemIds.map(Number) : suppliedIds;
+    const requestedItems = selectedIds.length
       ? booking.serviceItems.filter((item) => selectedIds.includes(item.id))
       : booking.serviceItems;
+    const alreadyInvoiced = await this.prisma.invoiceItem.findMany({
+      where: {
+        bookingServiceItemId: { in: requestedItems.map((item) => item.id) },
+        invoice: { status: { not: InvoiceStatus.CANCELLED } },
+      },
+      select: { bookingServiceItemId: true },
+    });
+    const invoicedIds = new Set(alreadyInvoiced.map((item) => item.bookingServiceItemId));
+    const sourceItems = requestedItems.filter((item) => !invoicedIds.has(item.id));
     if (!sourceItems.length) throw new BadRequestException('No booking service items available for invoice.');
 
-    const items = sourceItems.map((item) => ({
-      bookingServiceItemId: item.id,
-      description: item.description,
-      quantity: item.quantity,
-      rate: item.saleRate,
-      taxAmount: item.saleTax,
-      total: item.saleTotal,
-    }));
+    const items = sourceItems.map((item) => {
+      const supplied = suppliedItems.find((candidate: any) => Number(candidate.bookingServiceItemId) === item.id) || {};
+      const quantity = money(supplied.quantity ?? item.quantity);
+      const rate = money(supplied.rate ?? item.saleRate);
+      const taxAmount = money(supplied.taxAmount ?? item.saleTax);
+      return {
+        bookingServiceItemId: item.id,
+        hsnSac: supplied.hsnSac || body.hsnSac || DEFAULT_TRAVEL_SERVICE_HSN_SAC,
+        description: supplied.description || item.description,
+        quantity,
+        rate,
+        taxAmount,
+        total: money(quantity * rate + taxAmount),
+      };
+    });
 
     const totals = this.calcInvoiceTotals(items);
     const invoiceNumber = body.invoiceNumber || (await this.nextInvoiceNumber(booking.companyId));
@@ -117,7 +192,10 @@ export class InvoicesService {
         },
       });
 
-      await tx.booking.update({ where: { id: booking.id }, data: { status: BookingStatus.INVOICED } });
+      const bookingStatus = invoicedIds.size + sourceItems.length >= booking.serviceItems.length
+        ? BookingStatus.INVOICED
+        : BookingStatus.PARTIALLY_INVOICED;
+      await tx.booking.update({ where: { id: booking.id }, data: { status: bookingStatus } });
 
       await this.createJournalForInvoice(tx, invoice.id, invoice.grandTotal as any);
       return tx.invoice.findUnique({ where: { id: invoice.id }, include: { client: true, company: true, booking: true, items: true } });
@@ -129,6 +207,12 @@ export class InvoicesService {
     if (!invoice) throw new NotFoundException('Invoice not found.');
     const amount = money(body.amount);
     if (amount <= 0) throw new BadRequestException('Payment amount must be greater than zero.');
+    if (invoice.status === InvoiceStatus.CANCELLED || invoice.status === InvoiceStatus.PAID) {
+      throw new BadRequestException('This invoice cannot accept another payment.');
+    }
+    if (amount > money(invoice.outstandingAmount)) {
+      throw new BadRequestException('Payment cannot exceed the invoice outstanding amount.');
+    }
 
     return this.prisma.$transaction(async (tx) => {
       const payment = await tx.clientPayment.create({

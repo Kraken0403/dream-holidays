@@ -67,12 +67,10 @@ database/mamp-init.sql
 ## Backend setup
 
 ```bash
-cd apps/api
-copy .env.example .env
+copy apps\\api\\.env.example apps\\api\\.env
 npm install
-npx prisma generate
-npx prisma migrate dev --name init
-npm run seed
+cd apps/api
+npm run setup
 npm run start:dev
 ```
 
@@ -90,11 +88,15 @@ DATABASE_URL="mysql://root:root@127.0.0.1:3306/dream_holidays_accounting"
 
 If your MAMP MySQL password is empty or different, update the same URL accordingly.
 
-Default login after seed:
+Before `npm run setup`, also set a real `INITIAL_ADMIN_EMAIL` and a unique
+`INITIAL_ADMIN_PASSWORD` of at least 8 characters in `apps/api/.env`.
+
+Administrator login after seed uses the `INITIAL_ADMIN_EMAIL` and
+`INITIAL_ADMIN_PASSWORD` values from `apps/api/.env`:
 
 ```txt
-Email: admin@dreamholidays.local
-Password: Admin@12345
+Email: value of INITIAL_ADMIN_EMAIL
+Password: value of INITIAL_ADMIN_PASSWORD
 ```
 
 ## Frontend setup
@@ -111,14 +113,16 @@ npm run dev
 Open:
 
 ```txt
-http://localhost:3000
+http://localhost:3001
 ```
 
 Backend:
 
 ```txt
-http://localhost:4000/api
+http://localhost:6001/api
 ```
+
+The initial admin is created automatically only when there is no active administrator. Configure it in `apps/api/.env` before production use.
 
 ## Included modules
 
@@ -136,7 +140,20 @@ http://localhost:4000/api
 - Vendor bills/payables
 - Vendor payments
 - Reports summary
+- Monthly, quarterly, half-yearly, financial-year and custom-date reports
+- Search, related filters, pagination and applicable date ranges on lists
+- CSV exports for reports and passbooks
 - Prisma seed using Dream Holidays vendor/service Excel structure
+
+## Verification commands
+
+```bash
+npm run build
+npm run test:api
+npm run smoke:api
+```
+
+See `docs/PROJECT-BRIEF.md` and `docs/TEST-REPORT.md` for the handover summary.
 
 ## Git development flow
 
@@ -144,4 +161,4 @@ See `docs/git-nexus-development.md`.
 
 ## Notes
 
-This is a strong starter codebase. It intentionally keeps UI simple and clean so we can iterate module-by-module without breaking the accounting core.
+Change the initial admin password and JWT secret before production deployment. Keep database backups before applying migrations to an existing installation.

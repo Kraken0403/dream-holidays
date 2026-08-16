@@ -10,6 +10,11 @@ export class InvoicesController {
   @Get()
   findAll(@Query() query: any) { return this.service.findAll(query); }
 
+  @Get('from-booking/:bookingId/preview')
+  previewFromBooking(@Param('bookingId') bookingId: string) {
+    return this.service.previewFromBooking(Number(bookingId));
+  }
+
   @Post('from-booking/:bookingId')
   createFromBooking(@Param('bookingId') bookingId: string, @Body() body: any) {
     return this.service.createFromBooking(Number(bookingId), body);

@@ -12,10 +12,37 @@
 
     <!-- Chart of Accounts -->
     <div v-if="!selectedAccount" class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <TableControls
+        v-model:search="accountTable.search.value"
+        v-model:page="accountTable.page.value"
+        v-model:page-size="accountTable.pageSize.value"
+        :page-size-options="accountTable.pageSizeOptions"
+        :total="accountTable.total.value"
+        :filtered="accountTable.filtered.value"
+        :start="accountTable.start.value"
+        :end="accountTable.end.value"
+        exportable
+        :selected-count="accountSelection.selectedCount.value"
+        :filter-count="accountTypeFilter ? 1 : 0"
+        search-placeholder="Search accounts, codes..."
+        @export="accountSelection.exportXls"
+        @clear-selection="accountSelection.clear"
+      >
+        <template #filters>
+          <div class="w-full sm:w-44">
+            <label class="block text-xs font-medium text-gray-600 mb-1.5">Type</label>
+            <select v-model="accountTypeFilter" :class="INP">
+              <option value="">All</option>
+              <option v-for="type in accountTypes" :key="type" :value="type">{{ type }}</option>
+            </select>
+          </div>
+        </template>
+      </TableControls>
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead>
             <tr class="bg-gray-50 border-b border-gray-100">
+              <th class="w-10 px-3 py-3"><input type="checkbox" aria-label="Select page" :checked="accountSelection.pageAllSelected.value" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" @change="accountSelection.togglePage" /></th>
               <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Code</th>
               <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Account</th>
               <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Type</th>
@@ -26,7 +53,8 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-50">
-            <tr v-for="a in accounts" :key="a.id" class="hover:bg-gray-50 transition-colors">
+            <tr v-for="a in accountTable.rows.value" :key="a.id" class="hover:bg-gray-50 transition-colors">
+              <td class="w-10 px-3 py-3"><input type="checkbox" :aria-label="`Select ${a.name}`" :checked="accountSelection.isSelected(a)" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" @change="accountSelection.toggle(a)" /></td>
               <td class="px-4 py-3">
                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-medium bg-gray-100 text-gray-700">{{ a.code }}</span>
               </td>
@@ -41,8 +69,8 @@
                 </button>
               </td>
             </tr>
-            <tr v-if="!accounts.length">
-              <td colspan="7" class="px-4 py-10 text-center text-gray-400">No accounts found.</td>
+            <tr v-if="!accountTable.filtered.value">
+              <td colspan="8" class="px-4 py-10 text-center text-gray-400">No accounts found.</td>
             </tr>
           </tbody>
         </table>
@@ -67,18 +95,20 @@
       <!-- Date filters -->
       <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 mb-5">
         <div class="flex flex-wrap items-end gap-3">
-          <div>
-            <label class="block text-xs font-medium text-gray-600 mb-1.5">From</label>
-            <input v-model="ledgerFilters.from" type="date" :class="INP" @change="loadLedger" />
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-gray-600 mb-1.5">To</label>
-            <input v-model="ledgerFilters.to" type="date" :class="INP" @change="loadLedger" />
-          </div>
+          <DateRangeFilter
+            v-model:preset="ledgerFilters.period"
+            v-model:from="ledgerFilters.from"
+            v-model:to="ledgerFilters.to"
+            @change="loadLedger"
+          />
         </div>
       </div>
 
-      <div v-if="ledger" class="grid grid-cols-3 gap-4 mb-5">
+      <div v-if="ledger" class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+          <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Opening Balance</p>
+          <p class="text-xl font-bold text-gray-900 mt-1 tabular-nums">{{ fmt(ledger.openingBalance) }}</p>
+        </div>
         <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
           <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Debit</p>
           <p class="text-xl font-bold text-red-600 mt-1 tabular-nums">{{ fmt(ledger.totalDebit) }}</p>
@@ -94,10 +124,26 @@
       </div>
 
       <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <TableControls
+          v-model:search="ledgerTable.search.value"
+          v-model:page="ledgerTable.page.value"
+          v-model:page-size="ledgerTable.pageSize.value"
+          :page-size-options="ledgerTable.pageSizeOptions"
+          :total="ledgerTable.total.value"
+          :filtered="ledgerTable.filtered.value"
+          :start="ledgerTable.start.value"
+          :end="ledgerTable.end.value"
+          exportable
+          :selected-count="ledgerSelection.selectedCount.value"
+          search-placeholder="Search ledger rows..."
+          @export="ledgerSelection.exportXls"
+          @clear-selection="ledgerSelection.clear"
+        />
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
               <tr class="bg-gray-50 border-b border-gray-100">
+                <th class="w-10 px-3 py-3"><input type="checkbox" aria-label="Select page" :checked="ledgerSelection.pageAllSelected.value" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" @change="ledgerSelection.togglePage" /></th>
                 <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Date</th>
                 <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Source</th>
                 <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Narration</th>
@@ -107,7 +153,8 @@
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-50">
-              <tr v-for="row in ledger?.rows || []" :key="row.id" class="hover:bg-gray-50">
+              <tr v-for="row in ledgerTable.rows.value" :key="row.id" class="hover:bg-gray-50">
+                <td class="w-10 px-3 py-3"><input type="checkbox" aria-label="Select ledger row" :checked="ledgerSelection.isSelected(row)" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" @change="ledgerSelection.toggle(row)" /></td>
                 <td class="px-4 py-3 text-gray-600 whitespace-nowrap">{{ fmtDate(row.date) }}</td>
                 <td class="px-4 py-3">
                   <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">{{ row.sourceType }}</span>
@@ -117,8 +164,8 @@
                 <td class="px-4 py-3 text-right tabular-nums" :class="row.credit ? 'text-green-600 font-medium' : 'text-gray-300'">{{ row.credit ? fmt(row.credit) : '—' }}</td>
                 <td class="px-4 py-3 text-right tabular-nums font-bold text-gray-900">{{ fmt(row.balance) }}</td>
               </tr>
-              <tr v-if="!ledger?.rows?.length">
-                <td colspan="6" class="px-4 py-10 text-center text-gray-400">No transactions in this period.</td>
+              <tr v-if="!ledgerTable.filtered.value">
+                <td colspan="7" class="px-4 py-10 text-center text-gray-400">No transactions in this period.</td>
               </tr>
             </tbody>
           </table>
@@ -186,21 +233,42 @@
 
 <script setup>
 const { request } = useApi()
+const toast = useToast()
 const { formatMoney } = useMoney()
+const { formatDate, todayInput } = useDateTime()
 const INP = 'w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow'
 const accounts = ref([])
+const accountTypeFilter = ref('')
 const selectedAccount = ref(null)
 const ledger = ref(null)
-const ledgerFilters = reactive({ from: '', to: '' })
+const ledgerFilters = reactive({ period: 'all', from: '', to: '' })
 const showJournal = ref(false)
-const jForm = reactive({ date: new Date().toISOString().slice(0, 10), narration: '', lines: [] })
+const jForm = reactive({ date: todayInput(), narration: '', lines: [] })
 const fmt = (v) => formatMoney(v)
-const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
+const fmtDate = formatDate
+const accountTypes = computed(() => [...new Set(accounts.value.map((account) => account.type).filter(Boolean))].sort())
+const filteredAccounts = computed(() => accountTypeFilter.value ? accounts.value.filter((account) => account.type === accountTypeFilter.value) : accounts.value)
+const accountTable = useTableControls(filteredAccounts, {
+  searchFields: ['code', 'name', 'type'],
+})
+const accountSelection = useListingSelection(accountTable, [
+  { label: 'Code', field: 'code' }, { label: 'Account', field: 'name' }, { label: 'Type', field: 'type' },
+  { label: 'Total Debit', field: (row) => fmt(row.totalDebit) }, { label: 'Total Credit', field: (row) => fmt(row.totalCredit) }, { label: 'Balance', field: (row) => fmt(row.balance) },
+], 'accounts')
+const ledgerRows = computed(() => ledger.value?.rows || [])
+const ledgerTable = useTableControls(ledgerRows, {
+  searchFields: ['sourceType', 'narration', (row) => fmtDate(row.date)],
+})
+const ledgerSelection = useListingSelection(ledgerTable, [
+  { label: 'Date', field: (row) => fmtDate(row.date) }, { label: 'Source', field: 'sourceType' }, { label: 'Narration', field: 'narration' },
+  { label: 'Debit', field: (row) => fmt(row.debit) }, { label: 'Credit', field: (row) => fmt(row.credit) }, { label: 'Balance', field: (row) => fmt(row.balance) },
+], 'account-ledger')
 
 async function loadAccounts() { accounts.value = await request('/accounts') }
 
 async function viewLedger(a) {
   selectedAccount.value = a; ledger.value = null
+  ledgerTable.reset()
   await loadLedger()
 }
 
@@ -214,7 +282,7 @@ async function loadLedger() {
 }
 
 function openJournal() {
-  Object.assign(jForm, { date: new Date().toISOString().slice(0, 10), narration: '', lines: [] })
+  Object.assign(jForm, { date: todayInput(), narration: '', lines: [] })
   addLine(); addLine()
   showJournal.value = true
 }
@@ -226,6 +294,7 @@ async function saveJournal() {
   showJournal.value = false
   await loadAccounts()
   if (selectedAccount.value) await loadLedger()
+  toast.success('Journal entry posted.')
 }
 
 onMounted(loadAccounts)

@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { BookingStatus } from '@prisma/client';
 import { money, sum } from '../../common/number';
+import { dateRangeWhere, readDateRange } from '../../common/date-range';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
@@ -16,10 +17,10 @@ export class BookingsService {
     const quantity = money(item.quantity || 1);
     const saleRate = money(item.saleRate);
     const saleTax = money(item.saleTax);
-    const saleTotal = item.saleTotal === undefined ? money(quantity * saleRate + saleTax) : money(item.saleTotal);
+    const saleTotal = money(quantity * saleRate + saleTax);
     const vendorCost = money(item.vendorCost);
     const vendorTax = money(item.vendorTax);
-    const vendorTotal = item.vendorTotal === undefined ? money(vendorCost + vendorTax) : money(item.vendorTotal);
+    const vendorTotal = money(quantity * vendorCost + vendorTax);
     const margin = money(saleTotal - vendorTotal);
     return {
       categoryId: Number(item.categoryId),
@@ -47,8 +48,11 @@ export class BookingsService {
 
   findAll(query: any) {
     const where: any = {};
+    const dateRange = dateRangeWhere(readDateRange(query));
     if (query.status) where.status = query.status;
     if (query.clientId) where.clientId = Number(query.clientId);
+    if (query.companyId) where.companyId = Number(query.companyId);
+    if (dateRange) where.bookingDate = dateRange;
     if (query.search) {
       where.OR = [
         { bookingNumber: { contains: query.search } },
@@ -73,7 +77,7 @@ export class BookingsService {
         salesPerson: true,
         passengers: true,
         serviceItems: { include: { category: { include: { parent: true } }, vendor: true } },
-        invoices: true,
+        invoices: { orderBy: { id: 'desc' } },
         vendorBills: { include: { vendor: true } },
         clientPayments: true,
         vendorPayments: true,
@@ -118,6 +122,17 @@ export class BookingsService {
 
       let totalsUpdate = {};
       if (Array.isArray(body.serviceItems)) {
+        const billedItems = await tx.bookingServiceItem.count({
+          where: {
+            bookingId: id,
+            OR: [{ invoiceItems: { some: {} } }, { vendorBillItems: { some: {} } }],
+          },
+        });
+        if (billedItems > 0) {
+          throw new BadRequestException(
+            'Service items cannot be replaced after an invoice or vendor bill has been generated.',
+          );
+        }
         const items = body.serviceItems.map((item: any) => this.normalizeItem(item));
         totalsUpdate = this.totals(items);
         await tx.bookingServiceItem.deleteMany({ where: { bookingId: id } });

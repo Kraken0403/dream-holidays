@@ -1,0 +1,1 @@
+ALTER TABLE `InvoiceItem` ADD COLUMN `hsnSac` VARCHAR(191) NULL;

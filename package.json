@@ -8,6 +8,10 @@
   ],
   "scripts": {
     "api:dev": "npm --workspace apps/api run start:dev",
-    "web:dev": "npm --workspace apps/web run dev"
+    "web:dev": "npm --workspace apps/web run dev",
+    "build": "npm --workspace apps/api run build && npm --workspace apps/web run build",
+    "db:setup": "node scripts/setup-database.mjs",
+    "test:api": "npm --workspace apps/api run test:api",
+    "smoke:api": "node scripts/api-smoke.mjs"
   }
 }

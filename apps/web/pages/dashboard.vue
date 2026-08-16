@@ -1,8 +1,21 @@
 <template>
   <div>
     <div class="mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
+      <h1 class="text-lg font-semibold text-gray-900">Dashboard</h1>
       <p class="text-sm text-gray-500 mt-1">Financial overview — sales, margins, receivables and payables.</p>
+    </div>
+
+    <div class="mb-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div class="flex flex-wrap items-end gap-3">
+        <DateRangeFilter
+          v-model:preset="filters.period"
+          v-model:from="filters.from"
+          v-model:to="filters.to"
+        />
+        <button type="button" class="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700" @click="load">
+          Refresh overview
+        </button>
+      </div>
     </div>
 
     <!-- Primary KPI row -->
@@ -43,7 +56,7 @@
     <div class="grid grid-cols-3 gap-4">
       <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 text-center">
         <div class="text-3xl font-bold text-gray-900">{{ data.bookingCount || 0 }}</div>
-        <div class="text-sm text-gray-500 mt-1">Bookings</div>
+        <div class="text-sm text-gray-500 mt-1">My Bookings</div>
       </div>
       <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 text-center">
         <div class="text-3xl font-bold text-gray-900">{{ data.invoiceCount || 0 }}</div>
@@ -61,6 +74,13 @@
 const { request } = useApi()
 const { formatMoney } = useMoney()
 const data = ref({})
+const filters = reactive({ period: 'all', from: '', to: '' })
 const fmt = (v) => formatMoney(v || 0)
-onMounted(async () => { data.value = await request('/reports/dashboard') })
+async function load() {
+  const qs = new URLSearchParams()
+  if (filters.from) qs.append('from', filters.from)
+  if (filters.to) qs.append('to', filters.to)
+  data.value = await request(`/reports/dashboard${qs.toString() ? '?' + qs : ''}`)
+}
+onMounted(load)
 </script>

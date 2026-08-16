@@ -10,10 +10,37 @@
     </PageHeader>
 
     <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <TableControls
+        v-model:search="clientTable.search.value"
+        v-model:page="clientTable.page.value"
+        v-model:page-size="clientTable.pageSize.value"
+        :page-size-options="clientTable.pageSizeOptions"
+        :total="clientTable.total.value"
+        :filtered="clientTable.filtered.value"
+        :start="clientTable.start.value"
+        :end="clientTable.end.value"
+        exportable
+        :selected-count="clientSelection.selectedCount.value"
+        :filter-count="stateFilter ? 1 : 0"
+        search-placeholder="Search clients, phone, email..."
+        @export="clientSelection.exportXls"
+        @clear-selection="clientSelection.clear"
+      >
+        <template #filters>
+          <div class="w-full sm:w-44">
+            <label class="block text-xs font-medium text-gray-600 mb-1.5">State</label>
+            <select v-model="stateFilter" :class="INP">
+              <option value="">All</option>
+              <option v-for="state in states" :key="state" :value="state">{{ state }}</option>
+            </select>
+          </div>
+        </template>
+      </TableControls>
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead>
             <tr class="border-b border-gray-100 bg-gray-50">
+              <th class="w-10 px-3 py-3"><input type="checkbox" aria-label="Select page" :checked="clientSelection.pageAllSelected.value" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" @change="clientSelection.togglePage" /></th>
               <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Name</th>
               <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Contact</th>
               <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">GST</th>
@@ -21,7 +48,8 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-50">
-            <tr v-for="c in clients" :key="c.id" class="hover:bg-gray-50 transition-colors">
+            <tr v-for="c in clientTable.rows.value" :key="c.id" class="hover:bg-gray-50 transition-colors">
+              <td class="w-10 px-3 py-3"><input type="checkbox" :aria-label="`Select ${c.name}`" :checked="clientSelection.isSelected(c)" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" @change="clientSelection.toggle(c)" /></td>
               <td class="px-4 py-3">
                 <div class="font-semibold text-gray-900">{{ c.name }}</div>
                 <div class="text-gray-400 text-xs">{{ c.companyName || '' }}</div>
@@ -30,7 +58,7 @@
               <td class="px-4 py-3 text-gray-600">{{ c.gstNumber || '—' }}</td>
               <td class="px-4 py-3 text-gray-600">{{ c.state || '—' }}</td>
             </tr>
-            <tr v-if="!clients.length"><td colspan="4" class="px-4 py-10 text-center text-gray-400">No clients yet.</td></tr>
+            <tr v-if="!clientTable.filtered.value"><td colspan="5" class="px-4 py-10 text-center text-gray-400">No clients found.</td></tr>
           </tbody>
         </table>
       </div>
@@ -62,14 +90,27 @@
 
 <script setup>
 const { request } = useApi()
+const toast = useToast()
+const INP = 'w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow'
 const clients = ref([])
+const stateFilter = ref('')
 const showModal = ref(false)
 const editId = ref(null)
 const blank = () => ({ name: '', companyName: '', phone: '', email: '', gstNumber: '', state: '', billingAddress: '' })
 const form = reactive(blank())
+const states = computed(() => [...new Set(clients.value.map((client) => client.state).filter(Boolean))].sort())
+const filteredClients = computed(() => stateFilter.value ? clients.value.filter((client) => client.state === stateFilter.value) : clients.value)
+const clientTable = useTableControls(filteredClients, {
+  searchFields: ['name', 'companyName', 'phone', 'email', 'gstNumber', 'state'],
+})
+const clientSelection = useListingSelection(clientTable, [
+  { label: 'Name', field: 'name' }, { label: 'Company', field: 'companyName' }, { label: 'Phone', field: 'phone' },
+  { label: 'Email', field: 'email' }, { label: 'GST', field: 'gstNumber' }, { label: 'State', field: 'state' }, { label: 'Billing Address', field: 'billingAddress' },
+], 'clients')
 function openCreate() { editId.value = null; Object.assign(form, blank()); showModal.value = true }
 async function load() { clients.value = await request('/clients') }
 async function save() {
+  const wasEditing = Boolean(editId.value)
   if (editId.value) {
     await request(`/clients/${editId.value}`, { method: 'PATCH', body: { ...form } })
   } else {
@@ -77,6 +118,7 @@ async function save() {
   }
   showModal.value = false
   await load()
+  toast.success(wasEditing ? 'Client updated.' : 'Client created.')
 }
 onMounted(load)
 </script>

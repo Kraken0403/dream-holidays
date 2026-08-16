@@ -8,7 +8,7 @@ export class ReportsController {
   constructor(private readonly service: ReportsService) {}
 
   @Get('dashboard')
-  dashboard() { return this.service.dashboard(); }
+  dashboard(@Query() query: any) { return this.service.dashboard(query); }
 
   @Get('aging/receivables')
   agingReceivables() { return this.service.agingReceivables(); }
@@ -20,7 +20,7 @@ export class ReportsController {
   profitAndLoss(@Query() query: any) { return this.service.profitAndLoss(query); }
 
   @Get('trial-balance')
-  trialBalance() { return this.service.trialBalance(); }
+  trialBalance(@Query() query: any) { return this.service.trialBalance(query); }
 
   @Get('clients')
   listClients() { return this.service.listClients(); }

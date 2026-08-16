@@ -1,6 +1,6 @@
 <template>
   <div>
-    <PageHeader title="Companies" subtitle="Billing entities from which invoices are issued.">
+    <PageHeader title="My Companies" subtitle="Billing entities from which invoices are issued.">
       <template #actions>
         <button type="button" @click="openCreate"
           class="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm">
@@ -9,8 +9,31 @@
         </button>
       </template>
     </PageHeader>
+    <SettingsTabs />
 
     <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <TableControls
+        v-model:search="companyTable.search.value"
+        v-model:page="companyTable.page.value"
+        v-model:page-size="companyTable.pageSize.value"
+        :page-size-options="companyTable.pageSizeOptions"
+        :total="companyTable.total.value"
+        :filtered="companyTable.filtered.value"
+        :start="companyTable.start.value"
+        :end="companyTable.end.value"
+        search-placeholder="Search companies, GST, PAN..."
+      >
+        <template #filters>
+          <div class="w-full sm:w-40">
+            <label class="block text-xs font-medium text-gray-600 mb-1.5">Status</label>
+            <select v-model="statusFilter" :class="INP">
+              <option value="">All</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+        </template>
+      </TableControls>
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead>
@@ -24,7 +47,7 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-50">
-            <tr v-for="c in companies" :key="c.id" class="hover:bg-gray-50 transition-colors">
+            <tr v-for="c in companyTable.rows.value" :key="c.id" class="hover:bg-gray-50 transition-colors">
               <td class="px-4 py-3">
                 <div class="flex items-center gap-3">
                   <div class="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-sm flex-shrink-0 overflow-hidden">
@@ -64,7 +87,7 @@
                 </div>
               </td>
             </tr>
-            <tr v-if="!companies.length">
+            <tr v-if="!companyTable.filtered.value">
               <td colspan="6" class="px-4 py-10 text-center text-gray-400">No companies found.</td>
             </tr>
           </tbody>
@@ -143,12 +166,22 @@
 
 <script setup>
 const { request } = useApi()
+const toast = useToast()
 const INP = 'w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow'
 const companies = ref([])
+const statusFilter = ref('')
 const showModal = ref(false)
 const editId = ref(null)
 const saving = ref(false)
 const logoStatus = ref('')
+const filteredCompanies = computed(() => {
+  if (!statusFilter.value) return companies.value
+  const active = statusFilter.value === 'active'
+  return companies.value.filter((company) => Boolean(company.active) === active)
+})
+const companyTable = useTableControls(filteredCompanies, {
+  searchFields: ['name', 'legalName', 'email', 'phone', 'gstNumber', 'panNumber', 'invoicePrefix'],
+})
 
 const blankForm = () => ({
   name: '', legalName: '', gstNumber: '', panNumber: '',
@@ -185,17 +218,21 @@ async function uploadLogo(event) {
   const body = new FormData(); body.append('file', file)
   const uploaded = await request('/uploads/company-logo', { method: 'POST', body })
   form.logoUrl = uploaded.url; logoStatus.value = file.name
+  toast.success('Company logo uploaded.')
 }
 async function deactivate(c) {
   if (!confirm(`Deactivate "${c.name}"?`)) return
   await request(`/companies/${c.id}`, { method: 'DELETE' }); await load()
+  toast.success('Company deactivated.')
 }
 async function save() {
   saving.value = true
+  const wasEditing = Boolean(editId.value)
   try {
     if (editId.value) { await request(`/companies/${editId.value}`, { method: 'PATCH', body: { ...form } }) }
     else { await request('/companies', { method: 'POST', body: { ...form } }) }
     showModal.value = false; resetForm(); await load()
+    toast.success(wasEditing ? 'Company updated.' : 'Company created.')
   } finally { saving.value = false }
 }
 onMounted(load)
