@@ -12,16 +12,41 @@ function searchableText(value) {
   return String(value).toLowerCase()
 }
 
+function humanizeField(field) {
+  return String(field || '').split('.').map(part => part.replace(/([a-z0-9])([A-Z])/g, '$1 $2')).join(' ').replace(/^./, value => value.toUpperCase())
+}
+
+function inferSortType(field) {
+  const name = String(field || '')
+  if (/(date|At)$/i.test(name)) return 'date'
+  if (/(amount|total|balance|count|quantity|rate|cost|margin|debit|credit|paid|outstanding|version)$/i.test(name)) return 'number'
+  return 'text'
+}
+
+function compareValues(left, right, type) {
+  if (left == null || left === '') return right == null || right === '' ? 0 : 1
+  if (right == null || right === '') return -1
+  if (type === 'number') {
+    const numeric = value => typeof value === 'number' ? value : Number(String(value || 0).replace(/[^0-9.-]+/g, ''))
+    return numeric(left) - numeric(right)
+  }
+  if (type === 'date') return new Date(left).getTime() - new Date(right).getTime()
+  return String(left).localeCompare(String(right), undefined, { numeric: true, sensitivity: 'base' })
+}
+
 export function useTableControls(source, options = {}) {
   const search = ref('')
   const page = ref(1)
   const pageSize = ref(options.pageSize || 10)
   const pageSizeOptions = options.pageSizeOptions || [10, 25, 50, 100]
+  const sortKey = ref(options.defaultSort?.key || '')
+  const sortDirection = ref(options.defaultSort?.direction || 'asc')
+  const registeredColumns = ref([])
 
   const allRows = computed(() => unref(source) || [])
   const searchFields = options.searchFields || []
 
-  const filteredRows = computed(() => {
+  const searchedRows = computed(() => {
     const query = search.value.trim().toLowerCase()
     if (!query) return allRows.value
 
@@ -29,6 +54,24 @@ export function useTableControls(source, options = {}) {
       if (!searchFields.length) return searchableText(row).includes(query)
       return searchFields.some((field) => searchableText(readField(row, field)).includes(query))
     })
+  })
+
+  const sortOptions = computed(() => {
+    const supplied = options.sortOptions || []
+    const fallback = searchFields.filter(field => typeof field === 'string').map(field => ({ key: String(field), field, label: humanizeField(field), type: inferSortType(field) }))
+    const combined = [...registeredColumns.value, ...supplied, ...fallback].map(option => typeof option === 'string' ? { key: option, field: option, label: humanizeField(option), type: inferSortType(option) } : { key: option.key || String(option.field), field: option.field ?? option.key, label: option.label || humanizeField(option.field ?? option.key), type: option.type || inferSortType(option.field ?? option.key), value: option.value })
+    return combined.filter((option, index) => option.key && combined.findIndex(candidate => candidate.key === option.key) === index)
+  })
+  const activeSort = computed(() => sortOptions.value.find(option => option.key === sortKey.value) || null)
+  const filteredRows = computed(() => {
+    if (!activeSort.value) return searchedRows.value
+    const option = activeSort.value
+    const direction = sortDirection.value === 'desc' ? -1 : 1
+    return searchedRows.value.map((row, index) => ({ row, index })).sort((left, right) => {
+      const leftValue = option.value ? option.value(left.row) : readField(left.row, option.field)
+      const rightValue = option.value ? option.value(right.row) : readField(right.row, option.field)
+      return (compareValues(leftValue, rightValue, option.type) * direction) || left.index - right.index
+    }).map(item => item.row)
   })
 
   const total = computed(() => allRows.value.length)
@@ -43,7 +86,24 @@ export function useTableControls(source, options = {}) {
     page.value = 1
   }
 
-  watch([search, pageSize], () => {
+  function registerColumns(columns = []) {
+    const normalized = columns.filter(column => column && column.field).map(column => ({
+      key: column.key || (typeof column.field === 'string' ? column.field : column.label),
+      field: column.field,
+      value: column.sortValue || (typeof column.field === 'function' ? column.field : column.value),
+      label: column.label,
+      type: column.type || inferSortType(column.key || column.field),
+    }))
+    registeredColumns.value = [...registeredColumns.value, ...normalized].filter((option, index, list) => list.findIndex(candidate => candidate.key === option.key) === index)
+  }
+
+  function setSort(key, direction) {
+    if (!key) { sortKey.value = ''; sortDirection.value = 'asc'; return }
+    if (sortKey.value === key && !direction) sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
+    else { sortKey.value = key; sortDirection.value = direction || 'asc' }
+  }
+
+  watch([search, pageSize, sortKey, sortDirection], () => {
     page.value = 1
   })
 
@@ -65,5 +125,11 @@ export function useTableControls(source, options = {}) {
     start,
     end,
     reset,
+    sortKey,
+    sortDirection,
+    sortOptions,
+    activeSort,
+    setSort,
+    registerColumns,
   }
 }

@@ -81,6 +81,8 @@
 
 <script setup>
 const route = useRoute()
+const { request } = useApi()
+const globalSettings = useState('global-settings', () => ({ dateFormat: 'DD/MM/YYYY' }))
 const isLogin = computed(() => route.path === '/login')
 const sidebarOpen = ref(false)
 const sidebarCollapsed = ref(false)
@@ -91,7 +93,7 @@ const pages = [
   { label: 'Dashboard', to: '/dashboard' }, { label: 'My Bookings', to: '/bookings' }, { label: 'Clients', to: '/clients' },
   { label: 'Invoices', to: '/invoices' }, { label: 'Vendor Payables', to: '/vendor-payables' }, { label: 'Passbook', to: '/passbook' },
   { label: 'Payment Tracking', to: '/payments' }, { label: 'Accounts / Ledger', to: '/accounts' }, { label: 'Reports', to: '/reports' },
-  { label: 'Global Settings', to: '/settings' }, { label: 'My Companies', to: '/companies' }, { label: 'Categories', to: '/categories' }, { label: 'Vendors', to: '/vendors' },
+  { label: 'Global Settings', to: '/settings' }, { label: 'Invoice Settings', to: '/invoice-settings' }, { label: 'My Companies', to: '/companies' }, { label: 'Categories', to: '/categories' }, { label: 'Vendors', to: '/vendors' },
 ]
 const searchResults = computed(() => pages.filter((item) => item.label.toLowerCase().includes(globalSearch.value.trim().toLowerCase())).slice(0, 8))
 
@@ -113,5 +115,9 @@ watch(() => route.path, (path) => {
   sidebarOpen.value = false
   const active = groupForPath(path)
   if (active) openGroup.value = active
+})
+onMounted(async () => {
+  if (isLogin.value) return
+  try { globalSettings.value = { ...globalSettings.value, ...await request('/settings', { toastError: false }) } } catch {}
 })
 </script>

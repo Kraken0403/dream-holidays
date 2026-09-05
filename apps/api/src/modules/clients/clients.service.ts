@@ -5,6 +5,12 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class ClientsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private profileData(body: any) {
+    return Object.fromEntries(['name', 'companyName', 'phone', 'email', 'gstNumber', 'panNumber', 'billingAddress', 'state']
+      .filter(key => body[key] !== undefined)
+      .map(key => [key, body[key]]));
+  }
+
   findAll(query: any) {
     const where: any = { active: true };
     if (query.search) {
@@ -28,11 +34,11 @@ export class ClientsService {
   }
 
   create(body: any) {
-    return this.prisma.client.create({ data: { ...body, openingBalance: body.openingBalance || 0 } });
+    return this.prisma.client.create({ data: { ...this.profileData(body), openingBalance: Number(body.openingBalance || 0) } as any });
   }
 
   update(id: number, body: any) {
-    return this.prisma.client.update({ where: { id }, data: body });
+    return this.prisma.client.update({ where: { id }, data: this.profileData(body) });
   }
 
   remove(id: number) {

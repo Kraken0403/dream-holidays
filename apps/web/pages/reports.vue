@@ -2,15 +2,7 @@
   <div>
     <PageHeader title="Reports" subtitle="P&amp;L, trial balance, and account statements." />
 
-    <!-- Tabs -->
-    <div class="flex flex-wrap gap-1 mb-5 bg-gray-100 p-1 rounded-lg w-fit">
-      <button
-        v-for="t in tabs" :key="t.id"
-        @click="switchTab(t.id)"
-        :class="tab === t.id ? 'bg-white text-gray-900 shadow-sm font-semibold' : 'text-gray-500 hover:text-gray-700'"
-        class="px-4 py-2 rounded-md text-sm transition-all"
-      >{{ t.label }}</button>
-    </div>
+    <AppTabs :model-value="tab" :tabs="tabs" class="mb-5" @update:model-value="switchTab" />
 
     <!-- P&L -->
     <div v-if="tab === 'pl'">
@@ -46,6 +38,7 @@
         </div>
         <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           <TableControls
+            :controller="plTable"
             v-model:search="plTable.search.value"
             v-model:page="plTable.page.value"
             v-model:page-size="plTable.pageSize.value"
@@ -54,6 +47,8 @@
             :filtered="plTable.filtered.value"
             :start="plTable.start.value"
             :end="plTable.end.value"
+            :rows="plTable.rows.value"
+            :available-columns="[{ key: 'accountCode', label: 'Account code' }, { key: 'group', label: 'Group' }]"
             exportable
             :selected-count="plSelection.selectedCount.value"
             search-placeholder="Search categories..."
@@ -111,6 +106,7 @@
       </div>
       <div v-if="tb" class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         <TableControls
+          :controller="tbTable"
           v-model:search="tbTable.search.value"
           v-model:page="tbTable.page.value"
           v-model:page-size="tbTable.pageSize.value"
@@ -119,6 +115,8 @@
           :filtered="tbTable.filtered.value"
           :start="tbTable.start.value"
           :end="tbTable.end.value"
+          :rows="tbTable.rows.value"
+          :available-columns="[{ key: 'accountId', label: 'Account ID' }, { key: 'normalBalance', label: 'Normal balance' }]"
           exportable
           :selected-count="tbSelection.selectedCount.value"
           search-placeholder="Search accounts..."
@@ -165,10 +163,7 @@
         <div class="flex flex-wrap items-end gap-3">
           <div class="min-w-[200px]">
             <label class="block text-xs font-medium text-gray-600 mb-1.5">Client</label>
-            <select v-model="stmtClientId" :class="INP">
-              <option value="">— Select Client —</option>
-              <option v-for="c in clients" :key="c.id" :value="c.id">{{ c.name }}{{ c.companyName ? ' (' + c.companyName + ')' : '' }}</option>
-            </select>
+            <SearchableSelect v-model="stmtClientId" :options="clients" secondary-key="companyName" placeholder="Search clients" />
           </div>
           <DateRangeFilter
             v-model:preset="stmtFilters.period"
@@ -196,6 +191,8 @@
         </div>
         <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           <TableControls
+            :controller="clientStmtTable"
+            table-key="reports-client-statement"
             v-model:search="clientStmtTable.search.value"
             v-model:page="clientStmtTable.page.value"
             v-model:page-size="clientStmtTable.pageSize.value"
@@ -204,6 +201,8 @@
             :filtered="clientStmtTable.filtered.value"
             :start="clientStmtTable.start.value"
             :end="clientStmtTable.end.value"
+            :rows="clientStmtTable.rows.value"
+            :available-columns="[{ key: 'bookingVersion', label: 'Booking version' }, { key: 'bookingDestination', label: 'Booking destination' }, { key: 'sourceType', label: 'Source type' }, { key: 'sourceId', label: 'Source ID' }, { key: 'createdAt', label: 'Created at' }]"
             exportable
             :selected-count="clientStmtSelection.selectedCount.value"
             search-placeholder="Search statement rows..."
@@ -216,6 +215,8 @@
               <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Date</th>
               <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Type</th>
               <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Ref</th>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Booking ID</th>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Booking Title</th>
               <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Description</th>
               <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Debit</th>
               <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Credit</th>
@@ -225,14 +226,16 @@
               <tr v-for="(r, i) in clientStmtTable.rows.value" :key="i" class="hover:bg-gray-50">
                 <td class="w-10 px-3 py-3"><input type="checkbox" aria-label="Select statement row" :checked="clientStmtSelection.isSelected(r)" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" @change="clientStmtSelection.toggle(r)" /></td>
                 <td class="px-4 py-3 text-gray-600 whitespace-nowrap">{{ fmtDate(r.date) }}</td>
-                <td class="px-4 py-3"><span :class="r.type === 'Invoice' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium">{{ r.type }}</span></td>
+                <td class="px-4 py-3"><span :class="statementTypeClass(r.type)" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium">{{ r.type }}</span></td>
                 <td class="px-4 py-3 text-xs text-gray-400">{{ r.ref || '—' }}</td>
+                <td class="px-4 py-3 text-xs font-semibold text-blue-700 whitespace-nowrap">{{ r.bookingNumber || '—' }}</td>
+                <td class="px-4 py-3 text-gray-700 text-xs max-w-[220px] truncate" :title="r.bookingTitle || ''">{{ r.bookingTitle || '—' }}</td>
                 <td class="px-4 py-3 text-gray-500 text-xs">{{ r.description || '—' }}</td>
                 <td class="px-4 py-3 text-right tabular-nums" :class="r.debit ? 'text-red-600 font-medium' : 'text-gray-300'">{{ r.debit ? fmt(r.debit) : '—' }}</td>
                 <td class="px-4 py-3 text-right tabular-nums" :class="r.credit ? 'text-green-600 font-medium' : 'text-gray-300'">{{ r.credit ? fmt(r.credit) : '—' }}</td>
                 <td class="px-4 py-3 text-right tabular-nums font-bold text-gray-900">{{ fmt(r.balance) }}</td>
               </tr>
-              <tr v-if="!clientStmtTable.filtered.value"><td colspan="8" class="px-4 py-10 text-center text-gray-400">No transactions.</td></tr>
+              <tr v-if="!clientStmtTable.filtered.value"><td colspan="10" class="px-4 py-10 text-center text-gray-400">No transactions.</td></tr>
             </tbody></table>
           </div>
         </div>
@@ -245,10 +248,7 @@
         <div class="flex flex-wrap items-end gap-3">
           <div class="min-w-[200px]">
             <label class="block text-xs font-medium text-gray-600 mb-1.5">Vendor</label>
-            <select v-model="stmtVendorId" :class="INP">
-              <option value="">— Select Vendor —</option>
-              <option v-for="v in vendors" :key="v.id" :value="v.id">{{ v.name }}</option>
-            </select>
+            <SearchableSelect v-model="stmtVendorId" :options="vendors" placeholder="Search vendors" />
           </div>
           <DateRangeFilter
             v-model:preset="stmtFilters.period"
@@ -275,6 +275,8 @@
         </div>
         <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           <TableControls
+            :controller="vendorStmtTable"
+            table-key="reports-vendor-statement"
             v-model:search="vendorStmtTable.search.value"
             v-model:page="vendorStmtTable.page.value"
             v-model:page-size="vendorStmtTable.pageSize.value"
@@ -283,6 +285,8 @@
             :filtered="vendorStmtTable.filtered.value"
             :start="vendorStmtTable.start.value"
             :end="vendorStmtTable.end.value"
+            :rows="vendorStmtTable.rows.value"
+            :available-columns="[{ key: 'bookingVersion', label: 'Booking version' }, { key: 'bookingDestination', label: 'Booking destination' }, { key: 'sourceType', label: 'Source type' }, { key: 'sourceId', label: 'Source ID' }, { key: 'createdAt', label: 'Created at' }]"
             exportable
             :selected-count="vendorStmtSelection.selectedCount.value"
             search-placeholder="Search statement rows..."
@@ -295,6 +299,8 @@
               <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Date</th>
               <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Type</th>
               <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Ref</th>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Booking ID</th>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Booking Title</th>
               <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Description</th>
               <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Debit</th>
               <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Credit</th>
@@ -304,14 +310,16 @@
               <tr v-for="(r, i) in vendorStmtTable.rows.value" :key="i" class="hover:bg-gray-50">
                 <td class="w-10 px-3 py-3"><input type="checkbox" aria-label="Select statement row" :checked="vendorStmtSelection.isSelected(r)" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" @change="vendorStmtSelection.toggle(r)" /></td>
                 <td class="px-4 py-3 text-gray-600 whitespace-nowrap">{{ fmtDate(r.date) }}</td>
-                <td class="px-4 py-3"><span :class="r.type === 'Bill' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium">{{ r.type }}</span></td>
+                <td class="px-4 py-3"><span :class="statementTypeClass(r.type)" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium">{{ r.type }}</span></td>
                 <td class="px-4 py-3 text-xs text-gray-400">{{ r.ref || '—' }}</td>
+                <td class="px-4 py-3 text-xs font-semibold text-blue-700 whitespace-nowrap">{{ r.bookingNumber || '—' }}</td>
+                <td class="px-4 py-3 text-gray-700 text-xs max-w-[220px] truncate" :title="r.bookingTitle || ''">{{ r.bookingTitle || '—' }}</td>
                 <td class="px-4 py-3 text-gray-500 text-xs">{{ r.description || '—' }}</td>
                 <td class="px-4 py-3 text-right tabular-nums" :class="r.debit ? 'text-red-600 font-medium' : 'text-gray-300'">{{ r.debit ? fmt(r.debit) : '—' }}</td>
                 <td class="px-4 py-3 text-right tabular-nums" :class="r.credit ? 'text-green-600 font-medium' : 'text-gray-300'">{{ r.credit ? fmt(r.credit) : '—' }}</td>
                 <td class="px-4 py-3 text-right tabular-nums font-bold text-gray-900">{{ fmt(r.balance) }}</td>
               </tr>
-              <tr v-if="!vendorStmtTable.filtered.value"><td colspan="8" class="px-4 py-10 text-center text-gray-400">No transactions.</td></tr>
+              <tr v-if="!vendorStmtTable.filtered.value"><td colspan="10" class="px-4 py-10 text-center text-gray-400">No transactions.</td></tr>
             </tbody></table>
           </div>
         </div>
@@ -368,10 +376,11 @@ async function loadTb() {
 const clients = ref([]), stmtClientId = ref(''), clientStmt = ref(null), stmtFilters = reactive({ period: 'all', from: '', to: '' })
 const clientStmtRows = computed(() => clientStmt.value?.rows || [])
 const clientStmtTable = useTableControls(clientStmtRows, {
-  searchFields: ['type', 'ref', 'description', (row) => fmtDate(row.date)],
+  searchFields: ['type', 'ref', 'description', 'bookingNumber', 'bookingTitle', 'bookingDestination', (row) => fmtDate(row.date)],
 })
 const statementColumns = [
   { label: 'Date', field: (row) => fmtDate(row.date) }, { label: 'Type', field: 'type' }, { label: 'Reference', field: 'ref' },
+  { label: 'Booking ID', field: 'bookingNumber' }, { label: 'Booking Title', field: 'bookingTitle' },
   { label: 'Description', field: 'description' }, { label: 'Debit', field: (row) => fmt(row.debit) },
   { label: 'Credit', field: (row) => fmt(row.credit) }, { label: 'Balance', field: (row) => fmt(row.balance) },
 ]
@@ -390,7 +399,7 @@ async function loadClientStmt() {
 const vendors = ref([]), stmtVendorId = ref(''), vendorStmt = ref(null)
 const vendorStmtRows = computed(() => vendorStmt.value?.rows || [])
 const vendorStmtTable = useTableControls(vendorStmtRows, {
-  searchFields: ['type', 'ref', 'description', (row) => fmtDate(row.date)],
+  searchFields: ['type', 'ref', 'description', 'bookingNumber', 'bookingTitle', 'bookingDestination', (row) => fmtDate(row.date)],
 })
 const vendorStmtSelection = useListingSelection(vendorStmtTable, statementColumns, 'vendor-statement')
 async function loadVendors() { vendors.value = await request('/reports/vendors') }
@@ -402,6 +411,14 @@ async function loadVendorStmt() {
   vendorStmt.value = await request(`/reports/vendor-statement/${stmtVendorId.value}${qs.toString() ? '?' + qs : ''}`)
   vendorStmtTable.reset()
   toast.success('Vendor statement generated.')
+}
+
+function statementTypeClass(type) {
+  const value = String(type || '').toLowerCase()
+  if (value.includes('credit note') || value === 'payment') return 'bg-green-100 text-green-700'
+  if (value.includes('cancellation charge')) return 'bg-amber-100 text-amber-800'
+  if (value.includes('cancelled')) return 'bg-red-100 text-red-700'
+  return 'bg-blue-100 text-blue-700'
 }
 
 function csvCell(value) {
@@ -430,8 +447,8 @@ function exportReport(type) {
   } else {
     const statement = type === 'client' ? clientStmt.value : vendorStmt.value
     const table = type === 'client' ? clientStmtTable : vendorStmtTable
-    downloadCsv(`${type}-statement-${stmtFilters.from || 'all'}-${stmtFilters.to || 'all'}.csv`, ['Date', 'Type', 'Reference', 'Description', 'Debit', 'Credit', 'Balance'],
-      table.filteredRows.value.map((row) => [fmtDate(row.date), row.type, row.ref, row.description, row.debit, row.credit, row.balance]))
+    downloadCsv(`${type}-statement-${stmtFilters.from || 'all'}-${stmtFilters.to || 'all'}.csv`, ['Date', 'Type', 'Reference', 'Booking ID', 'Booking Title', 'Description', 'Debit', 'Credit', 'Balance'],
+      table.filteredRows.value.map((row) => [fmtDate(row.date), row.type, row.ref, row.bookingNumber, row.bookingTitle, row.description, row.debit, row.credit, row.balance]))
   }
 }
 

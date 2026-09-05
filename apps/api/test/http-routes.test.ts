@@ -13,6 +13,7 @@ function model(defaultUnique: any = {}) {
     aggregate: async () => ({ _sum: { debit: 0, credit: 0 } }),
     create: async ({ data }: any) => ({ id: 1, ...data }),
     update: async ({ data }: any) => ({ id: 1, ...data }),
+    updateMany: async () => ({ count: 0 }),
     upsert: async ({ create }: any) => ({ id: 1, ...create }),
     deleteMany: async () => ({ count: 0 }),
     createMany: async () => ({ count: 0 }),
@@ -39,6 +40,8 @@ async function main() {
       bookingNumber: 'BK-1',
       companyId: 1,
       clientId: 1,
+      currentVersion: 1,
+      status: 'CONFIRMED',
       company: { invoiceTerms: '' },
       serviceItems: [{
         id: 1, categoryId: 1, vendorId: 1, description: 'Travel service', quantity: 1,
@@ -48,10 +51,12 @@ async function main() {
       vendorBills: [],
     }),
     bookingServiceItem: model(),
-    invoice: model({ id: 1, invoiceNumber: 'DH/1', status: 'SENT', grandTotal: 100, paidAmount: 0, outstandingAmount: 100, items: [], company: { bankAccounts: [] } }),
+    bookingVersion: model(),
+    bookingCancellation: model(),
+    invoice: model({ id: 1, invoiceNumber: 'DH/1', documentType: 'INVOICE', status: 'SENT', grandTotal: 100, paidAmount: 0, outstandingAmount: 100, items: [], company: { bankAccounts: [] } }),
     invoiceItem: model(),
     clientPayment: model(),
-    vendorBill: model({ id: 1, billNumber: 'VB-1', status: 'PENDING', grandTotal: 100, paidAmount: 0, outstandingAmount: 100, items: [] }),
+    vendorBill: model({ id: 1, billNumber: 'VB-1', documentType: 'BILL', status: 'PENDING', grandTotal: 100, paidAmount: 0, outstandingAmount: 100, items: [] }),
     vendorBillItem: model(),
     vendorPayment: model(),
     ledgerAccount: model({ id: 1, code: 'BANK', name: 'Bank', type: 'ASSET' }),
@@ -86,7 +91,7 @@ async function main() {
       '/reports/dashboard', '/reports/aging/receivables', '/reports/aging/payables', '/reports/pl',
       '/reports/trial-balance', '/reports/clients', '/reports/vendors',
       '/reports/client-statement/1', '/reports/vendor-statement/1',
-      '/passbook/clients', '/passbook/vendors', '/passbook/client/1', '/passbook/vendor/1',
+      '/passbook/clients', '/passbook/vendors', '/passbook/client/all', '/passbook/vendor/all', '/passbook/client/1', '/passbook/vendor/1',
       '/accounts', '/accounts/ledger/1',
     ];
 
@@ -114,11 +119,12 @@ async function main() {
       { method: 'DELETE', route: '/clients/1' },
       { method: 'POST', route: '/bookings', body: { clientId: 1, companyId: 1, title: 'Test Booking', serviceItems: [] } },
       { method: 'PATCH', route: '/bookings/1', body: { title: 'Updated Booking' } },
-      { method: 'DELETE', route: '/bookings/1' },
+      { method: 'DELETE', route: '/bookings/1', body: { reason: 'Route contract test' } },
       { method: 'POST', route: '/bookings/1/recalculate' },
       { method: 'POST', route: '/invoices', body: { clientId: 1, companyId: 1, items: [{ description: 'Service', quantity: 1, rate: 100, taxAmount: 18 }] } },
       { method: 'POST', route: '/invoices/from-booking/1', body: {} },
       { method: 'POST', route: '/invoices/1/payments', body: { amount: 50 } },
+      { method: 'POST', route: '/invoices/1/refresh-format' },
       { method: 'POST', route: '/vendor-payables', body: { vendorId: 1, items: [{ description: 'Service', quantity: 1, rate: 60, taxAmount: 9 }] } },
       { method: 'POST', route: '/vendor-payables/from-booking/1' },
       { method: 'POST', route: '/vendor-payables/1/payments', body: { amount: 50 } },
@@ -142,7 +148,21 @@ async function main() {
     assert.equal(uploadWithoutFile.status, 400);
     console.log('PASS POST /uploads/company-logo (rejects missing file)');
 
-    const total = getRoutes.length + mutationRoutes.length + 2;
+    const proofWithoutFile = await fetch(`${baseUrl}/api/uploads/payment-proof`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    assert.equal(proofWithoutFile.status, 400);
+    console.log('PASS POST /uploads/payment-proof (rejects missing file)');
+
+    const signatureWithoutFile = await fetch(`${baseUrl}/api/uploads/authorized-signature`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    assert.equal(signatureWithoutFile.status, 400);
+    console.log('PASS POST /uploads/authorized-signature (rejects missing file)');
+
+    const total = getRoutes.length + mutationRoutes.length + 4;
     console.log(`\n${total} authenticated HTTP route checks passed (including login and upload validation).`);
   } finally {
     await app.close();

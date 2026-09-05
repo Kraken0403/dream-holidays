@@ -2,7 +2,7 @@
   <div>
     <PageHeader title="Vendors" subtitle="Service provider master with category links.">
       <template #actions>
-        <button @click="openCreate" class="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm">
+        <button @click="openCreate" class="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-blue-700">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
           Add Vendor
         </button>
@@ -12,6 +12,7 @@
 
     <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       <TableControls
+        :controller="vendorTable"
         v-model:search="vendorTable.search.value"
         v-model:page="vendorTable.page.value"
         v-model:page-size="vendorTable.pageSize.value"
@@ -20,12 +21,16 @@
         :filtered="vendorTable.filtered.value"
         :start="vendorTable.start.value"
         :end="vendorTable.end.value"
+        :rows="vendorTable.rows.value"
+        :available-columns="[{ key: 'gstNumber', label: 'GST number' }, { key: 'panNumber', label: 'PAN number' }, { key: 'address', label: 'Address' }, { key: 'createdAt', label: 'Created at' }, { key: 'updatedAt', label: 'Updated at' }]"
         exportable
         :selected-count="vendorSelection.selectedCount.value"
         :filter-count="categoryFilter ? 1 : 0"
+        :active-filters="vendorActiveFilters"
         search-placeholder="Search vendors, contact, GST..."
         @export="vendorSelection.exportXls"
         @clear-selection="vendorSelection.clear"
+        @remove-filter="categoryFilter = ''"
       >
         <template #filters>
           <div class="w-full sm:w-56">
@@ -70,7 +75,7 @@
     <AppModal v-model="showModal" title="Add Vendor" subtitle="Service provider and category details" size="md" color="violet">
       <form id="vendor-form" @submit.prevent="save" class="space-y-4">
         <div class="grid grid-cols-2 gap-4">
-          <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Name *</label><input v-model="form.name" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" required /></div>
+          <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Name <span class="required-mark">*</span></label><input v-model="form.name" placeholder="Vendor name" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" required /></div>
           <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Phone</label><input v-model="form.phone" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" /></div>
         </div>
         <div class="grid grid-cols-2 gap-4">
@@ -105,6 +110,7 @@ const filteredVendors = computed(() => {
   if (!categoryFilter.value) return vendors.value
   return vendors.value.filter((vendor) => (vendor.categoryLinks || []).some((link) => Number(link.category?.id) === Number(categoryFilter.value)))
 })
+const vendorActiveFilters = computed(() => categoryFilter.value ? [{ key: 'category', label: `Category: ${categories.value.find(item => Number(item.id) === Number(categoryFilter.value))?.name || categoryFilter.value}` }] : [])
 const vendorTable = useTableControls(filteredVendors, {
   searchFields: [
     'name',
@@ -116,8 +122,10 @@ const vendorTable = useTableControls(filteredVendors, {
   ],
 })
 const vendorSelection = useListingSelection(vendorTable, [
-  { label: 'Vendor', field: 'name' }, { label: 'Code', field: 'code' }, { label: 'Phone', field: 'phone' }, { label: 'Email', field: 'email' },
-  { label: 'Categories', field: (row) => (row.categoryLinks || []).map((link) => link.category?.name).join(', ') }, { label: 'GST', field: 'gstNumber' },
+  { key: 'name', label: 'Vendor', field: (row) => `${row.name}${row.code ? ` — ${row.code}` : ''}` },
+  { key: 'contact', label: 'Contact', field: (row) => row.phone || row.email || '' },
+  { key: 'categories', label: 'Categories', field: (row) => (row.categoryLinks || []).map((link) => link.category?.name).join(', ') },
+  { key: 'gstNumber', label: 'GST', field: 'gstNumber' },
 ], 'vendors')
 function openCreate() { Object.assign(form, { name: '', phone: '', email: '', gstNumber: '', categoryIds: [] }); showModal.value = true }
 async function load() { vendors.value = await request('/vendors'); categories.value = await request('/categories') }

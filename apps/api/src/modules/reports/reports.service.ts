@@ -22,9 +22,21 @@ export class ReportsService {
     const range = readDateRange(query);
     const dateFilter = dateRangeWhere(range);
     const [bookings, invoices, vendorBills, clientPayments, vendorPayments] = await Promise.all([
-      this.prisma.booking.findMany({ where: dateFilter ? { bookingDate: dateFilter } : undefined, select: { totalSaleAmount: true, totalVendorCost: true, grossMargin: true } }),
-      this.prisma.invoice.findMany({ where: { status: { not: 'CANCELLED' }, ...(dateFilter ? { invoiceDate: dateFilter } : {}) }, select: { grandTotal: true, outstandingAmount: true, paidAmount: true } }),
-      this.prisma.vendorBill.findMany({ where: { status: { not: 'CANCELLED' }, ...(dateFilter ? { billDate: dateFilter } : {}) }, select: { grandTotal: true, outstandingAmount: true, paidAmount: true } }),
+      this.prisma.booking.findMany({
+        where: { status: { not: 'CANCELLED' }, ...(dateFilter ? { bookingDate: dateFilter } : {}) },
+        select: {
+          id: true, bookingNumber: true, bookingVersion: true, title: true, status: true, bookingDate: true,
+          totalSaleAmount: true, totalVendorCost: true, grossMargin: true,
+          client: { select: { name: true, companyName: true } },
+        },
+        orderBy: { bookingDate: 'desc' },
+      }),
+      this.prisma.invoice.findMany({
+        where: { documentType: { not: 'PROFORMA' }, ...(dateFilter ? { invoiceDate: dateFilter } : {}) },
+        select: { id: true, invoiceNumber: true, invoiceDate: true, status: true, documentType: true, grandTotal: true, outstandingAmount: true, paidAmount: true, booking: { select: { bookingNumber: true, title: true } } },
+        orderBy: { invoiceDate: 'desc' },
+      }),
+      this.prisma.vendorBill.findMany({ where: dateFilter ? { billDate: dateFilter } : undefined, select: { documentType: true, grandTotal: true, outstandingAmount: true, paidAmount: true } }),
       this.prisma.clientPayment.findMany({ where: dateFilter ? { paymentDate: dateFilter } : undefined, select: { amount: true } }),
       this.prisma.vendorPayment.findMany({ where: dateFilter ? { paymentDate: dateFilter } : undefined, select: { amount: true } }),
     ]);
@@ -32,7 +44,7 @@ export class ReportsService {
     const bookingSale = bookings.reduce((acc, b) => acc + n(b.totalSaleAmount), 0);
     const bookingCost = bookings.reduce((acc, b) => acc + n(b.totalVendorCost), 0);
     const expectedMargin = bookings.reduce((acc, b) => acc + n(b.grossMargin), 0);
-    const invoiceSales = invoices.reduce((acc, i) => acc + n(i.grandTotal), 0);
+    const invoiceSales = invoices.reduce((acc, i) => acc + (i.documentType === 'CREDIT_NOTE' ? -n(i.grandTotal) : n(i.grandTotal)), 0);
     const receivable = invoices.reduce((acc, i) => acc + n(i.outstandingAmount), 0);
     const payable = vendorBills.reduce((acc, b) => acc + n(b.outstandingAmount), 0);
     const clientReceived = clientPayments.reduce((acc, p) => acc + n(p.amount), 0);
@@ -43,8 +55,32 @@ export class ReportsService {
       receivable, payable, clientReceived, vendorPaid,
       netCashPosition: clientReceived - vendorPaid,
       bookingCount: bookings.length,
-      invoiceCount: invoices.length,
-      vendorBillCount: vendorBills.length,
+      invoiceCount: invoices.filter((invoice) => invoice.documentType === 'INVOICE').length,
+      vendorBillCount: vendorBills.filter((bill) => bill.documentType === 'BILL').length,
+      bookingStatusBreakdown: Object.entries(bookings.reduce((acc: Record<string, number>, booking: any) => {
+        acc[booking.status] = (acc[booking.status] || 0) + 1;
+        return acc;
+      }, {})).map(([status, count]) => ({ status, count: Number(count) })),
+      recentBookings: bookings.slice(0, 5).map((booking: any) => ({
+        id: booking.id,
+        bookingNumber: booking.bookingNumber,
+        bookingVersion: booking.bookingVersion,
+        title: booking.title,
+        status: booking.status,
+        bookingDate: booking.bookingDate,
+        grossMargin: n(booking.grossMargin),
+        clientName: booking.client?.companyName || booking.client?.name || '',
+      })),
+      recentInvoices: invoices.filter((invoice) => invoice.documentType === 'INVOICE').slice(0, 5).map((invoice: any) => ({
+        id: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        invoiceDate: invoice.invoiceDate,
+        status: invoice.status,
+        grandTotal: n(invoice.grandTotal),
+        outstandingAmount: n(invoice.outstandingAmount),
+        bookingNumber: invoice.booking?.bookingNumber || '',
+        bookingTitle: invoice.booking?.title || '',
+      })),
       from: range.from || null,
       to: range.to || null,
     };
@@ -52,7 +88,7 @@ export class ReportsService {
 
   async agingReceivables() {
     const invoices = await this.prisma.invoice.findMany({
-      where: { status: { notIn: ['CANCELLED', 'PAID'] } },
+      where: { documentType: 'INVOICE', status: { notIn: ['CANCELLED', 'PAID'] } },
       include: { client: { select: { id: true, name: true, companyName: true } } },
       orderBy: { dueDate: 'asc' },
     });
@@ -80,7 +116,7 @@ export class ReportsService {
 
   async agingPayables() {
     const bills = await this.prisma.vendorBill.findMany({
-      where: { status: { notIn: ['CANCELLED', 'PAID'] } },
+      where: { documentType: 'BILL', status: { notIn: ['CANCELLED', 'PAID'] } },
       include: { vendor: { select: { id: true, name: true } } },
       orderBy: { dueDate: 'asc' },
     });
@@ -113,34 +149,34 @@ export class ReportsService {
 
     const [invoices, vendorBills] = await Promise.all([
       this.prisma.invoice.findMany({
-        where: { status: { not: 'CANCELLED' }, invoiceDate: { gte: from, lte: to } },
+        where: { documentType: { not: 'PROFORMA' }, invoiceDate: { gte: from, lte: to } },
         include: { items: { include: { bookingServiceItem: { include: { category: { include: { parent: true } } } } } } },
       }),
       this.prisma.vendorBill.findMany({
-        where: { status: { not: 'CANCELLED' }, billDate: { gte: from, lte: to } },
+        where: { billDate: { gte: from, lte: to } },
         include: { items: { include: { bookingServiceItem: { include: { category: { include: { parent: true } } } } } } },
       }),
     ]);
 
-    const totalRevenue = invoices.reduce((s, i) => s + n(i.grandTotal), 0);
-    const totalCost = vendorBills.reduce((s, b) => s + n(b.grandTotal), 0);
+    const totalRevenue = invoices.reduce((s, i) => s + (i.documentType === 'CREDIT_NOTE' ? -n(i.grandTotal) : n(i.grandTotal)), 0);
+    const totalCost = vendorBills.reduce((s, b) => s + (b.documentType === 'CREDIT_NOTE' ? -n(b.grandTotal) : n(b.grandTotal)), 0);
     const grossProfit = totalRevenue - totalCost;
 
     const byCategory: Record<string, { name: string; revenue: number; cost: number; margin: number }> = {};
     for (const inv of invoices) {
       for (const item of inv.items) {
         const cat = item.bookingServiceItem?.category;
-        const key = cat ? (cat.parent ? `${cat.parent.name} / ${cat.name}` : cat.name) : 'Uncategorised';
+        const key = cat ? (cat.parent ? `${cat.parent.name} / ${cat.name}` : cat.name) : inv.cancellationId ? 'Cancellation Charges' : 'Uncategorised';
         if (!byCategory[key]) byCategory[key] = { name: key, revenue: 0, cost: 0, margin: 0 };
-        byCategory[key].revenue += n(item.total);
+        byCategory[key].revenue += inv.documentType === 'CREDIT_NOTE' ? -n(item.total) : n(item.total);
       }
     }
     for (const bill of vendorBills) {
       for (const item of bill.items) {
         const cat = item.bookingServiceItem?.category;
-        const key = cat ? (cat.parent ? `${cat.parent.name} / ${cat.name}` : cat.name) : 'Uncategorised';
+        const key = cat ? (cat.parent ? `${cat.parent.name} / ${cat.name}` : cat.name) : bill.cancellationId ? 'Cancellation Charges' : 'Uncategorised';
         if (!byCategory[key]) byCategory[key] = { name: key, revenue: 0, cost: 0, margin: 0 };
-        byCategory[key].cost += n(item.total);
+        byCategory[key].cost += bill.documentType === 'CREDIT_NOTE' ? -n(item.total) : n(item.total);
       }
     }
     const breakdown = Object.values(byCategory).map(c => ({ ...c, margin: c.revenue - c.cost }));
@@ -178,22 +214,40 @@ export class ReportsService {
     const df = dateRangeWhere(range);
 
     const [priorInvoices, priorPayments] = range.from ? await Promise.all([
-      this.prisma.invoice.findMany({ where: { clientId, status: { not: 'CANCELLED' }, invoiceDate: beforeDateWhere(range.from) }, select: { grandTotal: true } }),
+      this.prisma.invoice.findMany({ where: { clientId, documentType: { not: 'PROFORMA' }, invoiceDate: beforeDateWhere(range.from) }, select: { grandTotal: true, documentType: true } }),
       this.prisma.clientPayment.findMany({ where: { clientId, paymentDate: beforeDateWhere(range.from) }, select: { amount: true } }),
     ]) : [[], []];
 
     const [invoices, payments] = await Promise.all([
-      this.prisma.invoice.findMany({ where: { clientId, status: { not: 'CANCELLED' }, ...(df ? { invoiceDate: df } : {}) }, include: { booking: { select: { bookingNumber: true } } }, orderBy: { invoiceDate: 'asc' } }),
-      this.prisma.clientPayment.findMany({ where: { clientId, ...(df ? { paymentDate: df } : {}) }, orderBy: { paymentDate: 'asc' } }),
+      this.prisma.invoice.findMany({ where: { clientId, documentType: { not: 'PROFORMA' }, ...(df ? { invoiceDate: df } : {}) }, include: { booking: { select: { id: true, bookingNumber: true, title: true, bookingVersion: true, destination: true } } }, orderBy: { invoiceDate: 'asc' } }),
+      this.prisma.clientPayment.findMany({ where: { clientId, ...(df ? { paymentDate: df } : {}) }, include: { booking: { select: { id: true, bookingNumber: true, title: true, bookingVersion: true, destination: true } } }, orderBy: { paymentDate: 'asc' } }),
     ]);
 
     const entries: any[] = [
-      ...invoices.map(i => ({ date: i.invoiceDate, type: 'Invoice', ref: i.invoiceNumber, description: i.booking?.bookingNumber || '', debit: n(i.grandTotal), credit: 0 })),
-      ...payments.map(p => ({ date: p.paymentDate, type: 'Payment', ref: p.referenceNumber || '', description: p.paymentMode, debit: 0, credit: n(p.amount) })),
+      ...invoices.map(i => ({
+        date: i.invoiceDate,
+        type: i.documentType === 'CREDIT_NOTE'
+          ? (i.cancellationId ? 'Cancellation Credit Note' : 'Credit Note')
+          : i.cancellationId
+            ? (i.status === 'CANCELLED' ? 'Invoice (Cancelled)' : 'Cancellation Charge Invoice')
+            : 'Invoice',
+        ref: i.invoiceNumber,
+        sourceType: 'INVOICE',
+        sourceId: i.id,
+        description: i.cancellationId ? 'Cancellation accounting document' : 'Invoice accounting document',
+        bookingId: i.booking?.id || null,
+        bookingNumber: i.booking?.bookingNumber || '',
+        bookingTitle: i.booking?.title || '',
+        bookingVersion: i.booking?.bookingVersion || null,
+        bookingDestination: i.booking?.destination || '',
+        debit: i.documentType === 'CREDIT_NOTE' ? 0 : n(i.grandTotal),
+        credit: i.documentType === 'CREDIT_NOTE' ? n(i.grandTotal) : 0,
+      })),
+      ...payments.map(p => ({ date: p.paymentDate, type: 'Payment', ref: p.referenceNumber || '', sourceType: 'CLIENT_PAYMENT', sourceId: p.id, description: p.paymentMode, bookingId: p.booking?.id || null, bookingNumber: p.booking?.bookingNumber || '', bookingTitle: p.booking?.title || '', bookingVersion: p.booking?.bookingVersion || null, bookingDestination: p.booking?.destination || '', debit: 0, credit: n(p.amount) })),
     ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     const openingBalance = n(client.openingBalance)
-      + priorInvoices.reduce((sum, invoice) => sum + n(invoice.grandTotal), 0)
+      + priorInvoices.reduce((sum, invoice) => sum + (invoice.documentType === 'CREDIT_NOTE' ? -n(invoice.grandTotal) : n(invoice.grandTotal)), 0)
       - priorPayments.reduce((sum, payment) => sum + n(payment.amount), 0);
     let balance = openingBalance;
     const rows = entries.map(e => { balance += e.debit - e.credit; return { ...e, balance }; });
@@ -208,22 +262,40 @@ export class ReportsService {
     const df = dateRangeWhere(range);
 
     const [priorBills, priorPayments] = range.from ? await Promise.all([
-      this.prisma.vendorBill.findMany({ where: { vendorId, status: { not: 'CANCELLED' }, billDate: beforeDateWhere(range.from) }, select: { grandTotal: true } }),
+      this.prisma.vendorBill.findMany({ where: { vendorId, billDate: beforeDateWhere(range.from) }, select: { grandTotal: true, documentType: true } }),
       this.prisma.vendorPayment.findMany({ where: { vendorId, paymentDate: beforeDateWhere(range.from) }, select: { amount: true } }),
     ]) : [[], []];
 
     const [bills, payments] = await Promise.all([
-      this.prisma.vendorBill.findMany({ where: { vendorId, status: { not: 'CANCELLED' }, ...(df ? { billDate: df } : {}) }, include: { booking: { select: { bookingNumber: true } } }, orderBy: { billDate: 'asc' } }),
-      this.prisma.vendorPayment.findMany({ where: { vendorId, ...(df ? { paymentDate: df } : {}) }, orderBy: { paymentDate: 'asc' } }),
+      this.prisma.vendorBill.findMany({ where: { vendorId, ...(df ? { billDate: df } : {}) }, include: { booking: { select: { id: true, bookingNumber: true, title: true, bookingVersion: true, destination: true } } }, orderBy: { billDate: 'asc' } }),
+      this.prisma.vendorPayment.findMany({ where: { vendorId, ...(df ? { paymentDate: df } : {}) }, include: { booking: { select: { id: true, bookingNumber: true, title: true, bookingVersion: true, destination: true } } }, orderBy: { paymentDate: 'asc' } }),
     ]);
 
     const entries: any[] = [
-      ...bills.map(b => ({ date: b.billDate, type: 'Bill', ref: b.billNumber, description: b.booking?.bookingNumber || '', debit: n(b.grandTotal), credit: 0 })),
-      ...payments.map(p => ({ date: p.paymentDate, type: 'Payment', ref: p.referenceNumber || '', description: p.paymentMode, debit: 0, credit: n(p.amount) })),
+      ...bills.map(b => ({
+        date: b.billDate,
+        type: b.documentType === 'CREDIT_NOTE'
+          ? (b.cancellationId ? 'Cancellation Vendor Credit Note' : 'Vendor Credit Note')
+          : b.cancellationId
+            ? (b.status === 'CANCELLED' ? 'Bill (Cancelled)' : 'Cancellation Charge Payable')
+            : 'Bill',
+        ref: b.billNumber,
+        sourceType: 'VENDOR_BILL',
+        sourceId: b.id,
+        description: b.cancellationId ? 'Cancellation accounting document' : 'Vendor payable accounting document',
+        bookingId: b.booking?.id || null,
+        bookingNumber: b.booking?.bookingNumber || '',
+        bookingTitle: b.booking?.title || '',
+        bookingVersion: b.booking?.bookingVersion || null,
+        bookingDestination: b.booking?.destination || '',
+        debit: b.documentType === 'CREDIT_NOTE' ? 0 : n(b.grandTotal),
+        credit: b.documentType === 'CREDIT_NOTE' ? n(b.grandTotal) : 0,
+      })),
+      ...payments.map(p => ({ date: p.paymentDate, type: 'Payment', ref: p.referenceNumber || '', sourceType: 'VENDOR_PAYMENT', sourceId: p.id, description: p.paymentMode, bookingId: p.booking?.id || null, bookingNumber: p.booking?.bookingNumber || '', bookingTitle: p.booking?.title || '', bookingVersion: p.booking?.bookingVersion || null, bookingDestination: p.booking?.destination || '', debit: 0, credit: n(p.amount) })),
     ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     const openingBalance = n(vendor.openingBalance)
-      + priorBills.reduce((sum, bill) => sum + n(bill.grandTotal), 0)
+      + priorBills.reduce((sum, bill) => sum + (bill.documentType === 'CREDIT_NOTE' ? -n(bill.grandTotal) : n(bill.grandTotal)), 0)
       - priorPayments.reduce((sum, payment) => sum + n(payment.amount), 0);
     let balance = openingBalance;
     const rows = entries.map(e => { balance += e.debit - e.credit; return { ...e, balance }; });

@@ -12,6 +12,7 @@
 const route = useRoute()
 const tabs = [
   { label: 'Global Settings', to: '/settings' },
+  { label: 'Invoice Settings', to: '/invoice-settings' },
   { label: 'My Companies', to: '/companies' },
   { label: 'Categories', to: '/categories' },
   { label: 'Vendors', to: '/vendors' },

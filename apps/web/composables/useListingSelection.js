@@ -8,6 +8,7 @@ function escapeHtml(value) {
 }
 
 export function useListingSelection(table, columns, fileName) {
+  table.registerColumns?.(columns)
   const selectedIds = ref(new Set())
   const rowId = (row) => String(row.id ?? row.key ?? JSON.stringify(row))
   const isSelected = (row) => selectedIds.value.has(rowId(row))
@@ -33,11 +34,37 @@ export function useListingSelection(table, columns, fileName) {
     selectedIds.value = new Set()
   }
 
-  function exportXls() {
+  function configuredExportColumns(configuration) {
+    if (!Array.isArray(configuration?.columns) || !configuration.columns.length) return columns
+    const unused = [...columns]
+    return configuration.columns.map((configured) => {
+      if (configured.custom) {
+        return {
+          label: configured.label,
+          field: configured.value || configured.sourceKey,
+          format: configured.format,
+          defaultValue: configured.defaultValue,
+        }
+      }
+      const normalized = String(configured.originalLabel || '').trim().toLowerCase()
+      let index = unused.findIndex(column => String(column.originalLabel || column.label || '').trim().toLowerCase() === normalized)
+      if (index < 0) index = 0
+      const [matched] = unused.splice(index, 1)
+      return matched ? { ...matched, label: configured.label || matched.label } : null
+    }).filter(Boolean)
+  }
+
+  function exportValue(row, column) {
+    const value = column.field ? readValue(row, column.field) : column.defaultValue
+    return column.format ? column.format(value, row) : value
+  }
+
+  function exportXls(configuration) {
     const selected = table.filteredRows.value.filter(isSelected)
     const rows = selected.length ? selected : table.filteredRows.value
-    const header = columns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join('')
-    const body = rows.map((row) => `<tr>${columns.map((column) => `<td>${escapeHtml(readValue(row, column.field))}</td>`).join('')}</tr>`).join('')
+    const exportColumns = configuredExportColumns(configuration)
+    const header = exportColumns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join('')
+    const body = rows.map((row) => `<tr>${exportColumns.map((column) => `<td>${escapeHtml(exportValue(row, column))}</td>`).join('')}</tr>`).join('')
     const html = `<html><head><meta charset="UTF-8"></head><body><table border="1"><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table></body></html>`
     const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' })
     const url = URL.createObjectURL(blob)

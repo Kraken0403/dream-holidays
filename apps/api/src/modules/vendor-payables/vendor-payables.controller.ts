@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { VendorPayablesService } from './vendor-payables.service';
 
@@ -20,6 +20,9 @@ export class VendorPayablesController {
     return this.service.generateFromBooking(Number(bookingId));
   }
 
+  @Get(':id/deletion-preview')
+  deletionPreview(@Param('id') id: string) { return this.service.deletionPreview(Number(id)); }
+
   @Get(':id')
   findOne(@Param('id') id: string) { return this.service.findOne(Number(id)); }
 
@@ -30,4 +33,7 @@ export class VendorPayablesController {
   recordPayment(@Param('id') id: string, @Body() body: any) {
     return this.service.recordPayment(Number(id), body);
   }
+
+  @Delete(':id')
+  remove(@Param('id') id: string) { return this.service.hardDelete(Number(id)); }
 }

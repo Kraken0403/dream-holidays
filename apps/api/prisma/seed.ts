@@ -60,6 +60,7 @@ const defaultSettings = [
   { key: 'invoiceNumberFormat', value: '{PREFIX}/{FY}/{NUMBER}', description: 'Invoice number format.' },
   { key: 'paymentModes', value: ['Cash', 'Bank Transfer', 'UPI', 'Cheque', 'Card'], description: 'Allowed payment modes.' },
   { key: 'defaultDueDays', value: 7, description: 'Default invoice due days.' },
+  { key: 'dateFormat', value: 'DD/MM/YYYY', description: 'Application-wide displayed date format.' },
   { key: 'roundingEnabled', value: true, description: 'Whether invoice round off is enabled.' }
 ];
 
@@ -186,6 +187,8 @@ async function main() {
   await upsertLedger('BANK', 'Default Bank / Cash', 'ASSET');
   await upsertLedger('SALES', 'Sales Revenue', 'INCOME');
   await upsertLedger('PURCHASE', 'Vendor Cost / Purchases', 'EXPENSE');
+  await upsertLedger('CANCELLATION_INCOME', 'Cancellation Fee Income', 'INCOME');
+  await upsertLedger('CANCELLATION_EXPENSE', 'Vendor Cancellation Charges', 'EXPENSE');
   await upsertLedger('CLIENTS', 'Client Receivables Control', 'ASSET');
   await upsertLedger('VENDORS', 'Vendor Payables Control', 'LIABILITY');
 

@@ -3,7 +3,7 @@
     <PageHeader title="My Companies" subtitle="Billing entities from which invoices are issued.">
       <template #actions>
         <button type="button" @click="openCreate"
-          class="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm">
+          class="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-blue-700">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
           Add Company
         </button>
@@ -13,6 +13,7 @@
 
     <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       <TableControls
+        :controller="companyTable"
         v-model:search="companyTable.search.value"
         v-model:page="companyTable.page.value"
         v-model:page-size="companyTable.pageSize.value"
@@ -21,7 +22,14 @@
         :filtered="companyTable.filtered.value"
         :start="companyTable.start.value"
         :end="companyTable.end.value"
+        :rows="companyTable.rows.value"
+        :available-columns="[{ key: 'legalName', label: 'Legal name' }, { key: 'gstNumber', label: 'GST number' }, { key: 'panNumber', label: 'PAN number' }, { key: 'email', label: 'Email' }, { key: 'state', label: 'State' }, { key: 'createdAt', label: 'Created at' }]"
+        :filter-count="statusFilter ? 1 : 0"
+        :active-filters="companyActiveFilters"
+        exportable
         search-placeholder="Search companies, GST, PAN..."
+        @export="companyExport.exportXls"
+        @remove-filter="statusFilter = ''"
       >
         <template #filters>
           <div class="w-full sm:w-40">
@@ -82,8 +90,8 @@
               </td>
               <td class="px-4 py-3">
                 <div class="flex items-center gap-2">
-                  <button type="button" @click="openEdit(c)" class="px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 rounded-lg transition-colors">Edit</button>
-                  <button type="button" @click="deactivate(c)" class="px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 hover:bg-red-50 rounded-lg transition-colors">Deactivate</button>
+                  <button type="button" @click="openEdit(c)" class="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-50"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m15.2 5.2 3.6 3.6M4 20l4.5-1 10.3-10.2a2.55 2.55 0 0 0-3.6-3.6L5 15.5 4 20Z"/></svg>Edit</button>
+                  <button type="button" @click="deactivate(c)" class="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M6 18 18 6M6 6l12 12"/></svg>Deactivate</button>
                 </div>
               </td>
             </tr>
@@ -99,7 +107,7 @@
     <AppModal v-model="showModal" :title="editId ? 'Edit Company' : 'Add Company'" subtitle="Configure billing entity details and bank accounts" size="xl" color="blue">
       <form id="co-form" @submit.prevent="save" class="space-y-5">
         <div class="grid grid-cols-2 gap-4">
-          <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Name *</label><input v-model="form.name" :class="INP" required /></div>
+          <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Name <span class="required-mark">*</span></label><input v-model="form.name" placeholder="Company name" :class="INP" required /></div>
           <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Legal Name</label><input v-model="form.legalName" :class="INP" /></div>
         </div>
         <div class="grid grid-cols-2 gap-4">
@@ -111,13 +119,13 @@
           <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Phone</label><input v-model="form.phone" :class="INP" /></div>
         </div>
         <div class="grid grid-cols-2 gap-4">
-          <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Invoice Prefix *</label><input v-model="form.invoicePrefix" :class="INP" required placeholder="DH" /></div>
+          <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Invoice Prefix <span class="required-mark">*</span></label><input v-model="form.invoicePrefix" :class="INP" required placeholder="DH" /></div>
           <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Proforma Prefix</label><input v-model="form.proformaPrefix" :class="INP" placeholder="PI" /></div>
         </div>
         <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Address</label><textarea v-model="form.addressLine1" :class="INP" rows="2"></textarea></div>
         <div class="grid grid-cols-4 gap-3">
           <div><label class="block text-sm font-medium text-gray-700 mb-1.5">City</label><input v-model="form.city" :class="INP" /></div>
-          <div><label class="block text-sm font-medium text-gray-700 mb-1.5">State</label><input v-model="form.state" :class="INP" /></div>
+          <div><label class="block text-sm font-medium text-gray-700 mb-1.5">State</label><StateSelect v-model="form.state" /></div>
           <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Country</label><input v-model="form.country" :class="INP" /></div>
           <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Pincode</label><input v-model="form.pincode" :class="INP" /></div>
         </div>
@@ -132,7 +140,7 @@
         <div class="border-t border-gray-200 pt-5">
           <div class="flex items-center justify-between mb-4">
             <h4 class="text-sm font-semibold text-gray-900">Bank Accounts</h4>
-            <button type="button" @click="addBank" class="text-sm text-blue-600 hover:text-blue-700 font-medium">+ Add Bank</button>
+            <button type="button" @click="addBank" class="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M12 5v14M5 12h14"/></svg>Add Bank</button>
           </div>
           <div v-for="(b, i) in form.bankAccounts" :key="i" class="bg-gray-50 rounded-lg p-4 border border-gray-200 mb-3">
             <div class="grid grid-cols-2 gap-3 mb-3">
@@ -148,7 +156,7 @@
                 <input type="checkbox" v-model="b.isDefault" @change="setDefault(i)" class="rounded" />
                 Set as default
               </label>
-              <button type="button" @click="removeBank(i)" class="text-xs text-red-600 hover:text-red-700 font-medium">Remove</button>
+              <button type="button" @click="removeBank(i)" class="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M6 18 18 6M6 6l12 12"/></svg>Remove</button>
             </div>
           </div>
           <p v-if="!form.bankAccounts.length" class="text-sm text-gray-400">No bank accounts added.</p>
@@ -179,9 +187,17 @@ const filteredCompanies = computed(() => {
   const active = statusFilter.value === 'active'
   return companies.value.filter((company) => Boolean(company.active) === active)
 })
+const companyActiveFilters = computed(() => statusFilter.value ? [{ key: 'status', label: `Status: ${statusFilter.value === 'active' ? 'Active' : 'Inactive'}` }] : [])
 const companyTable = useTableControls(filteredCompanies, {
   searchFields: ['name', 'legalName', 'email', 'phone', 'gstNumber', 'panNumber', 'invoicePrefix'],
 })
+const companyExport = useListingSelection(companyTable, [
+  { key: 'name', label: 'Company', field: row => [row.name, row.legalName, row.email, row.phone].filter(Boolean).join(' — ') },
+  { key: 'taxIds', label: 'GST / PAN', field: row => [row.gstNumber, row.panNumber].filter(Boolean).join(' / ') },
+  { key: 'invoicePrefix', label: 'Invoice Prefix', field: 'invoicePrefix' },
+  { key: 'bankAccounts', label: 'Bank Accounts', field: row => (row.bankAccounts || []).map(account => `${account.bankName} · ${account.accountNumber}`).join(', ') },
+  { key: 'active', label: 'Status', field: row => row.active ? 'Active' : 'Inactive' },
+], 'companies')
 
 const blankForm = () => ({
   name: '', legalName: '', gstNumber: '', panNumber: '',

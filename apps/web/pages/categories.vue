@@ -12,7 +12,7 @@
         </div>
         <form @submit.prevent="save" class="px-6 py-5 space-y-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1.5">Name *</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">Name <span class="required-mark">*</span></label>
             <input v-model="form.name" :class="INP" required placeholder="e.g. Hotel, Air Ticket, Visa" />
           </div>
           <div>
@@ -35,6 +35,7 @@
           <span class="text-sm text-gray-500">{{ tree.length }} top-level</span>
         </div>
         <TableControls
+          :controller="categoryTable"
           v-model:search="categoryTable.search.value"
           v-model:page="categoryTable.page.value"
           v-model:page-size="categoryTable.pageSize.value"
@@ -43,7 +44,11 @@
           :filtered="categoryTable.filtered.value"
           :start="categoryTable.start.value"
           :end="categoryTable.end.value"
+          :rows="categoryTable.rows.value"
+          :available-columns="[{ key: 'parent.name', label: 'Parent category' }, { key: 'createdAt', label: 'Created at' }, { key: 'updatedAt', label: 'Updated at' }]"
+          exportable
           search-placeholder="Search categories..."
+          @export="categoryExport.exportXls"
         />
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
@@ -87,6 +92,10 @@ const form = reactive({ name: '', parentId: null })
 const categoryTable = useTableControls(tree, {
   searchFields: ['name', (category) => (category.children || []).map((child) => child.name).join(' ')],
 })
+const categoryExport = useListingSelection(categoryTable, [
+  { key: 'name', label: 'Category', field: 'name' },
+  { key: 'children', label: 'Subcategories', field: row => (row.children || []).map(child => child.name).join(', ') },
+], 'categories')
 async function load() { tree.value = await request('/categories/tree') }
 async function save() {
   await request('/categories', { method: 'POST', body: form })

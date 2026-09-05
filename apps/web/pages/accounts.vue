@@ -3,7 +3,7 @@
     <PageHeader title="Accounts / Ledger" subtitle="Chart of accounts and journal entry ledger.">
       <template #actions>
         <button @click="openJournal"
-          class="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm">
+          class="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-blue-700">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
           Manual Entry
         </button>
@@ -13,6 +13,7 @@
     <!-- Chart of Accounts -->
     <div v-if="!selectedAccount" class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       <TableControls
+        :controller="accountTable"
         v-model:search="accountTable.search.value"
         v-model:page="accountTable.page.value"
         v-model:page-size="accountTable.pageSize.value"
@@ -21,12 +22,16 @@
         :filtered="accountTable.filtered.value"
         :start="accountTable.start.value"
         :end="accountTable.end.value"
+        :rows="accountTable.rows.value"
+        :available-columns="[{ key: 'normalBalance', label: 'Normal balance' }, { key: 'active', label: 'Active' }, { key: 'createdAt', label: 'Created at' }]"
         exportable
         :selected-count="accountSelection.selectedCount.value"
         :filter-count="accountTypeFilter ? 1 : 0"
+        :active-filters="accountActiveFilters"
         search-placeholder="Search accounts, codes..."
         @export="accountSelection.exportXls"
         @clear-selection="accountSelection.clear"
+        @remove-filter="accountTypeFilter = ''"
       >
         <template #filters>
           <div class="w-full sm:w-44">
@@ -64,8 +69,8 @@
               <td class="px-4 py-3 text-right tabular-nums text-gray-700">{{ fmt(a.totalCredit) }}</td>
               <td class="px-4 py-3 text-right tabular-nums font-bold" :class="a.balance < 0 ? 'text-red-600' : 'text-gray-900'">{{ fmt(a.balance) }}</td>
               <td class="px-4 py-3">
-                <button @click="viewLedger(a)" class="px-3 py-1.5 text-xs font-medium text-blue-600 border border-blue-200 hover:bg-blue-50 rounded-lg transition-colors">
-                  View Ledger
+                <button @click="viewLedger(a)" class="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 px-2.5 py-1.5 text-xs font-semibold text-blue-600 transition-colors hover:bg-blue-50">
+                  <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6Zm9 2.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/></svg>View Ledger
                 </button>
               </td>
             </tr>
@@ -125,6 +130,7 @@
 
       <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         <TableControls
+          :controller="ledgerTable"
           v-model:search="ledgerTable.search.value"
           v-model:page="ledgerTable.page.value"
           v-model:page-size="ledgerTable.pageSize.value"
@@ -133,11 +139,16 @@
           :filtered="ledgerTable.filtered.value"
           :start="ledgerTable.start.value"
           :end="ledgerTable.end.value"
+          :rows="ledgerTable.rows.value"
+          :available-columns="[{ key: 'sourceId', label: 'Source ID' }, { key: 'createdAt', label: 'Created at' }]"
           exportable
           :selected-count="ledgerSelection.selectedCount.value"
+          :filter-count="[ledgerFilters.from, ledgerFilters.to].filter(Boolean).length"
+          :active-filters="ledgerActiveFilters"
           search-placeholder="Search ledger rows..."
           @export="ledgerSelection.exportXls"
           @clear-selection="ledgerSelection.clear"
+          @remove-filter="removeLedgerFilter"
         />
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
@@ -178,28 +189,25 @@
       <form id="journal-form" @submit.prevent="saveJournal" class="space-y-4">
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1.5">Date *</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">Date <span class="required-mark">*</span></label>
             <input v-model="jForm.date" type="date" :class="INP" required />
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1.5">Narration *</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">Narration <span class="required-mark">*</span></label>
             <input v-model="jForm.narration" :class="INP" placeholder="Description of the entry" required />
           </div>
         </div>
         <div>
           <div class="flex items-center justify-between mb-3">
             <h4 class="text-sm font-semibold text-gray-900">Journal Lines</h4>
-            <button type="button" @click="addLine" class="text-sm text-blue-600 hover:text-blue-700 font-medium">+ Add Line</button>
+            <button type="button" @click="addLine" class="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M12 5v14M5 12h14"/></svg>Add Line</button>
           </div>
           <div class="space-y-3">
             <div v-for="(line, i) in jForm.lines" :key="i" class="bg-gray-50 rounded-lg p-4 border border-gray-200">
               <div class="grid grid-cols-3 gap-3">
                 <div class="col-span-1">
                   <label class="block text-xs font-medium text-gray-600 mb-1">Account</label>
-                  <select v-model="line.accountId" :class="INP + ' bg-white'" required>
-                    <option value="">— Select —</option>
-                    <option v-for="a in accounts" :key="a.id" :value="a.id">{{ a.code }} · {{ a.name }}</option>
-                  </select>
+                  <SearchableSelect v-model="line.accountId" :options="accounts" label-key="code" secondary-key="name" placeholder="Search accounts" />
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-600 mb-1">Debit</label>
@@ -242,12 +250,15 @@ const accountTypeFilter = ref('')
 const selectedAccount = ref(null)
 const ledger = ref(null)
 const ledgerFilters = reactive({ period: 'all', from: '', to: '' })
+const { periodLabel } = useFilterLabels()
 const showJournal = ref(false)
 const jForm = reactive({ date: todayInput(), narration: '', lines: [] })
 const fmt = (v) => formatMoney(v)
 const fmtDate = formatDate
 const accountTypes = computed(() => [...new Set(accounts.value.map((account) => account.type).filter(Boolean))].sort())
 const filteredAccounts = computed(() => accountTypeFilter.value ? accounts.value.filter((account) => account.type === accountTypeFilter.value) : accounts.value)
+const accountActiveFilters = computed(() => accountTypeFilter.value ? [{ key: 'type', label: `Type: ${accountTypeFilter.value}` }] : [])
+const ledgerActiveFilters = computed(() => { const period = periodLabel(ledgerFilters); return period ? [{ key: 'period', label: period }] : [] })
 const accountTable = useTableControls(filteredAccounts, {
   searchFields: ['code', 'name', 'type'],
 })
@@ -265,6 +276,7 @@ const ledgerSelection = useListingSelection(ledgerTable, [
 ], 'account-ledger')
 
 async function loadAccounts() { accounts.value = await request('/accounts') }
+function removeLedgerFilter() { Object.assign(ledgerFilters, { period: 'all', from: '', to: '' }); if (selectedAccount.value) loadLedger() }
 
 async function viewLedger(a) {
   selectedAccount.value = a; ledger.value = null

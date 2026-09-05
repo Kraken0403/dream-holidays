@@ -13,6 +13,16 @@ export class PassbookController {
   @Get('vendors')
   listVendors() { return this.service.listVendors(); }
 
+  @Get('client/all')
+  allClientsPassbook(@Query() query: any) {
+    return this.service.allClientsPassbook(query);
+  }
+
+  @Get('vendor/all')
+  allVendorsPassbook(@Query() query: any) {
+    return this.service.allVendorsPassbook(query);
+  }
+
   @Get('client/:clientId')
   clientPassbook(@Param('clientId') id: string, @Query() query: any) {
     return this.service.clientPassbook(Number(id), query);

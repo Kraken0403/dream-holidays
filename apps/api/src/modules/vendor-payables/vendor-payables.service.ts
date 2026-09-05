@@ -1,5 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { unlink } from 'node:fs/promises';
+import { resolve, sep } from 'node:path';
 import { JournalSourceType, VendorBillStatus } from '@prisma/client';
+import { maxSequenceFromValues, nextDocumentSequence } from '../../common/document-sequence';
 import { money, sum } from '../../common/number';
 import { dateRangeWhere, readDateRange } from '../../common/date-range';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -8,9 +11,21 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class VendorPayablesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private async nextBillNumber() {
-    const count = await this.prisma.vendorBill.count();
-    return `VB-${new Date().getFullYear()}-${String(count + 1).padStart(5, '0')}`;
+  private async nextBillNumber(tx: any, billDate = new Date()) {
+    const year = billDate.getFullYear();
+    const existing = await tx.vendorBill.findMany({
+      where: { documentType: 'BILL' },
+      select: { billNumber: true },
+    });
+    const seed = maxSequenceFromValues(existing.map((row: any) => row.billNumber), new RegExp(`^VB-${year}-(\\d+)$`));
+    const sequenceKey = `vendor-bill:${year}`;
+    for (let attempts = 0; attempts < 1000; attempts += 1) {
+      const next = await nextDocumentSequence(tx, sequenceKey, seed);
+      const candidate = `VB-${year}-${String(next).padStart(5, '0')}`;
+      const collision = await tx.vendorBill.findUnique({ where: { billNumber: candidate }, select: { id: true } });
+      if (!collision) return candidate;
+    }
+    throw new BadRequestException('Unable to allocate a unique vendor bill number.');
   }
 
   private totals(items: any[]) {
@@ -37,7 +52,7 @@ export class VendorPayablesService {
     }
     return this.prisma.vendorBill.findMany({
       where,
-      include: { vendor: true, booking: true, items: true },
+      include: { vendor: true, booking: true, items: true, paymentAllocations: { include: { vendorPayment: true } } },
       orderBy: { id: 'desc' },
     });
   }
@@ -62,16 +77,17 @@ export class VendorPayablesService {
     if (!items.length) throw new BadRequestException('At least one vendor bill item is required.');
 
     const totals = this.totals(items);
-    const billNumber = body.billNumber || (await this.nextBillNumber());
+    const billDate = body.billDate ? new Date(body.billDate) : new Date();
 
     return this.prisma.$transaction(async (tx) => {
+      const billNumber = body.billNumber || (await this.nextBillNumber(tx, billDate));
       const bill = await tx.vendorBill.create({
         data: {
           billNumber,
           vendorInvoiceNo: body.vendorInvoiceNo,
           vendorId: Number(body.vendorId),
           bookingId: body.bookingId ? Number(body.bookingId) : null,
-          billDate: body.billDate ? new Date(body.billDate) : new Date(),
+          billDate,
           dueDate: body.dueDate ? new Date(body.dueDate) : null,
           status: body.status || VendorBillStatus.PENDING,
           notes: body.notes,
@@ -90,12 +106,15 @@ export class VendorPayablesService {
       include: { serviceItems: true },
     });
     if (!booking) throw new NotFoundException('Booking not found.');
+    if (booking.status === 'CANCELLED') throw new BadRequestException('Vendor bills cannot be generated for a cancelled booking.');
+    const newerVersion = await this.prisma.booking.findFirst({ where: { previousVersionId: booking.id }, select: { bookingNumber: true } });
+    if (newerVersion) throw new BadRequestException(`This booking has been superseded by ${newerVersion.bookingNumber}. Generate vendor payables from the latest booking version.`);
 
     const itemsByVendor = new Map<number, any[]>();
     const existingItems = await this.prisma.vendorBillItem.findMany({
       where: {
         bookingServiceItemId: { in: booking.serviceItems.map((item) => item.id) },
-        vendorBill: { status: { not: VendorBillStatus.CANCELLED } },
+        vendorBill: { status: { not: VendorBillStatus.CANCELLED }, documentType: 'BILL' },
       },
       select: { bookingServiceItemId: true },
     });
@@ -108,11 +127,8 @@ export class VendorPayablesService {
     }
     if (!itemsByVendor.size) throw new BadRequestException('No vendor-costed service items found.');
 
-    const baseCount = await this.prisma.vendorBill.count();
-
     return this.prisma.$transaction(async (tx) => {
       const created: any[] = [];
-      let index = 0;
       for (const [vendorId, serviceItems] of itemsByVendor.entries()) {
         const billItems = serviceItems.map((item) => ({
           bookingServiceItemId: item.id,
@@ -123,14 +139,14 @@ export class VendorPayablesService {
           total: item.vendorTotal,
         }));
         const totals = this.totals(billItems);
-        index += 1;
-        const billNumber = `VB-${new Date().getFullYear()}-${String(baseCount + index).padStart(5, '0')}`;
+        const billDate = new Date();
+        const billNumber = await this.nextBillNumber(tx, billDate);
         const bill = await tx.vendorBill.create({
           data: {
             billNumber,
             vendorId,
             bookingId,
-            billDate: new Date(),
+            billDate,
             status: VendorBillStatus.PENDING,
             ...totals,
             items: { create: billItems },
@@ -139,6 +155,21 @@ export class VendorPayablesService {
         await this.createJournalForVendorBill(tx, bill.id, bill.grandTotal as any);
         created.push(bill);
       }
+      const version = booking.currentVersion + 1;
+      const versionedBooking = await tx.booking.update({
+        where: { id: bookingId },
+        data: { currentVersion: version },
+        include: { passengers: true, serviceItems: true },
+      });
+      await tx.bookingVersion.create({
+        data: {
+          bookingId,
+          version,
+          changeType: 'VENDOR_PAYABLES_CREATED',
+          changeNote: `${created.length} vendor payable(s) created`,
+          snapshot: JSON.parse(JSON.stringify(versionedBooking)),
+        },
+      });
       return created;
     });
   }
@@ -168,6 +199,7 @@ export class VendorPayablesService {
   async recordPayment(vendorBillId: number, body: any) {
     const bill = await this.prisma.vendorBill.findUnique({ where: { id: vendorBillId } });
     if (!bill) throw new NotFoundException('Vendor bill not found.');
+    if (bill.documentType !== 'BILL') throw new BadRequestException('Payments can only be recorded against vendor bills.');
     const amount = money(body.amount);
     if (amount <= 0) throw new BadRequestException('Payment amount must be greater than zero.');
     if (bill.status === VendorBillStatus.CANCELLED || bill.status === VendorBillStatus.PAID) {
@@ -188,6 +220,8 @@ export class VendorPayablesService {
           bankAccountId: body.bankAccountId ? Number(body.bankAccountId) : null,
           referenceNumber: body.referenceNumber,
           notes: body.notes,
+          proofUrl: body.proofUrl,
+          proofOriginalName: body.proofOriginalName,
           allocations: { create: [{ vendorBillId, amount }] },
         },
       });
@@ -199,6 +233,212 @@ export class VendorPayablesService {
       await this.createJournalForVendorPayment(tx, payment.id, amount);
       return tx.vendorPayment.findUnique({ where: { id: payment.id }, include: { allocations: true } });
     });
+  }
+
+  private localUploadPath(fileUrl?: string | null) {
+    if (!fileUrl) return null;
+    try {
+      const pathname = /^https?:\/\//i.test(fileUrl) ? new URL(fileUrl).pathname : fileUrl;
+      const decodedPath = decodeURIComponent(pathname).replace(/\\/g, '/');
+      if (!decodedPath.startsWith('/uploads/')) return null;
+      const uploadRoot = resolve(process.cwd(), 'uploads');
+      const absolutePath = resolve(process.cwd(), decodedPath.replace(/^\/+/, ''));
+      const rootKey = uploadRoot.toLowerCase();
+      const pathKey = absolutePath.toLowerCase();
+      if (pathKey !== rootKey && !pathKey.startsWith(`${rootKey}${sep.toLowerCase()}`)) return null;
+      return absolutePath;
+    } catch {
+      return null;
+    }
+  }
+
+  private async removeLocalFiles(fileUrls: Array<string | null | undefined>) {
+    const paths = [...new Set(fileUrls.map((fileUrl) => this.localUploadPath(fileUrl)).filter(Boolean) as string[])];
+    let removed = 0;
+    for (const path of paths) {
+      try {
+        await unlink(path);
+        removed += 1;
+      } catch (error: any) {
+        if (error?.code !== 'ENOENT') continue;
+      }
+    }
+    return removed;
+  }
+
+  private async billDeletionContext(db: any, vendorBillId: number) {
+    const bill = await db.vendorBill.findUnique({
+      where: { id: vendorBillId },
+      include: {
+        creditNotes: { select: { id: true, billNumber: true, cancellationId: true } },
+        booking: { select: { id: true, bookingNumber: true, status: true, currentVersion: true } },
+        vendor: { select: { id: true, name: true } },
+        items: { select: { id: true } },
+      },
+    });
+    if (!bill) throw new NotFoundException('Vendor bill not found.');
+
+    const protectedCancellationDocument = Boolean(
+      bill.cancellationId && (bill.documentType === 'CREDIT_NOTE' || bill.status === VendorBillStatus.CANCELLED),
+    );
+    if (protectedCancellationDocument) {
+      throw new BadRequestException('This is a system-generated cancellation reversal document. Delete the booking pipeline instead so cancellation accounting remains balanced.');
+    }
+    if (bill.creditNotes?.length) {
+      throw new BadRequestException('This vendor bill has linked credit note(s). Delete the booking pipeline instead so the reversal trail remains balanced.');
+    }
+
+    const payments = await db.vendorPayment.findMany({
+      where: { allocations: { some: { vendorBillId } } },
+      select: {
+        id: true,
+        proofUrl: true,
+        allocations: { select: { vendorBillId: true } },
+      },
+    });
+    const sharedPayment = payments.find((payment: any) => payment.allocations.some((allocation: any) => Number(allocation.vendorBillId) !== vendorBillId));
+    if (sharedPayment) {
+      throw new BadRequestException('This vendor payable has a payment shared with another payable. Split that payment before permanently deleting this vendor payable.');
+    }
+
+    return { bill, payments, paymentIds: payments.map((row: any) => Number(row.id)) };
+  }
+
+  async deletionPreview(vendorBillId: number) {
+    const { bill, payments, paymentIds } = await this.billDeletionContext(this.prisma, vendorBillId);
+    const [attachments, journalEntries] = await Promise.all([
+      this.prisma.attachment.findMany({
+        where: {
+          OR: [
+            { refType: { in: ['VENDOR_BILL', 'VendorBill', 'vendorBill', 'vendor-bill'] }, refId: vendorBillId },
+            { refType: { in: ['VENDOR_PAYMENT', 'VendorPayment', 'vendorPayment'] }, refId: { in: paymentIds } },
+          ],
+        },
+        select: { id: true, fileUrl: true },
+      }),
+      this.prisma.journalEntry.count({
+        where: {
+          OR: [
+            { sourceType: { in: [JournalSourceType.VENDOR_BILL, JournalSourceType.VENDOR_CREDIT_NOTE] }, sourceId: vendorBillId },
+            { sourceType: JournalSourceType.VENDOR_PAYMENT, sourceId: { in: paymentIds } },
+          ],
+        },
+      }),
+    ]);
+
+    return {
+      document: {
+        id: bill.id,
+        number: bill.billNumber,
+        documentType: bill.documentType,
+        status: bill.status,
+        vendor: bill.vendor,
+        booking: bill.booking,
+      },
+      counts: {
+        billItems: bill.items?.length || 0,
+        payments: paymentIds.length,
+        journalEntries,
+        storedFiles: attachments.length + payments.filter((row: any) => row.proofUrl).length,
+      },
+      warning: bill.cancellationId
+        ? 'This cancellation-charge vendor payable will be removed. The vendor cancellation charge remains recorded and can be posted again later.'
+        : 'The vendor payable, its exclusive payments, payment allocations, journal entries and stored payment proofs will be permanently removed.',
+    };
+  }
+
+  async hardDelete(vendorBillId: number) {
+    const fileUrls: string[] = [];
+    const result = await this.prisma.$transaction(async (tx) => {
+      const { bill, payments, paymentIds } = await this.billDeletionContext(tx, vendorBillId);
+      const attachments = await tx.attachment.findMany({
+        where: {
+          OR: [
+            { refType: { in: ['VENDOR_BILL', 'VendorBill', 'vendorBill', 'vendor-bill'] }, refId: vendorBillId },
+            { refType: { in: ['VENDOR_PAYMENT', 'VendorPayment', 'vendorPayment'] }, refId: { in: paymentIds } },
+          ],
+        },
+        select: { id: true, fileUrl: true },
+      });
+      fileUrls.push(...attachments.map((row: any) => row.fileUrl).filter(Boolean));
+      fileUrls.push(...payments.map((row: any) => row.proofUrl).filter(Boolean));
+
+      const journalWhere = {
+        OR: [
+          { sourceType: { in: [JournalSourceType.VENDOR_BILL, JournalSourceType.VENDOR_CREDIT_NOTE] }, sourceId: vendorBillId },
+          { sourceType: JournalSourceType.VENDOR_PAYMENT, sourceId: { in: paymentIds } },
+        ],
+      };
+      const journalEntries = await tx.journalEntry.count({ where: journalWhere });
+      await tx.journalEntry.deleteMany({ where: journalWhere });
+      await tx.attachment.deleteMany({ where: { id: { in: attachments.map((row: any) => Number(row.id)) } } });
+      await tx.auditLog.deleteMany({
+        where: {
+          OR: [
+            { entityType: { in: ['VENDOR_BILL', 'VendorBill', 'vendorBill'] }, entityId: vendorBillId },
+            { entityType: { in: ['VENDOR_PAYMENT', 'VendorPayment', 'vendorPayment'] }, entityId: { in: paymentIds } },
+          ],
+        },
+      });
+      await tx.vendorPayment.deleteMany({ where: { id: { in: paymentIds } } });
+
+      const cancellationChargeBill = Boolean(
+        bill.cancellationId && bill.documentType === 'BILL' && bill.status !== VendorBillStatus.CANCELLED,
+      );
+      await tx.vendorBill.delete({ where: { id: vendorBillId } });
+
+      if (cancellationChargeBill && bill.cancellationId) {
+        const remainingCancellationBills = await tx.vendorBill.count({
+          where: {
+            cancellationId: bill.cancellationId,
+            documentType: 'BILL',
+            status: { not: VendorBillStatus.CANCELLED },
+          },
+        });
+        await tx.bookingCancellation.update({
+          where: { id: bill.cancellationId },
+          data: { vendorChargeBillsCreated: remainingCancellationBills > 0 },
+        });
+      }
+
+      if (bill.bookingId && bill.booking) {
+        const currentBooking = await tx.booking.findUnique({
+          where: { id: bill.bookingId },
+          include: { passengers: true, serviceItems: true },
+        });
+        if (currentBooking) {
+          const version = currentBooking.currentVersion + 1;
+          const updatedBooking = await tx.booking.update({
+            where: { id: currentBooking.id },
+            data: { currentVersion: version },
+            include: { passengers: true, serviceItems: true },
+          });
+          await tx.bookingVersion.create({
+            data: {
+              bookingId: currentBooking.id,
+              version,
+              changeType: 'VENDOR_PAYABLE_DELETED',
+              changeNote: `Vendor payable ${bill.billNumber} permanently deleted`,
+              snapshot: JSON.parse(JSON.stringify(updatedBooking)),
+            },
+          });
+        }
+      }
+
+      return {
+        deleted: { id: bill.id, billNumber: bill.billNumber },
+        counts: {
+          vendorBills: 1,
+          billItems: bill.items?.length || 0,
+          payments: paymentIds.length,
+          journalEntries,
+          storedFiles: attachments.length + payments.filter((row: any) => row.proofUrl).length,
+        },
+      };
+    });
+
+    const filesRemoved = await this.removeLocalFiles(fileUrls);
+    return { ...result, filesRemoved };
   }
 
   private async getLedger(tx: any, code: string) {

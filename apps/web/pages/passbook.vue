@@ -1,35 +1,17 @@
 <template>
   <div>
-    <PageHeader title="Passbook" subtitle="Client and vendor ledger with running balance.">
-      <template #actions>
-        <button v-if="data" @click="exportCsv"
-          class="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
-          Export CSV
-        </button>
-      </template>
-    </PageHeader>
+    <PageHeader title="Passbook" subtitle="Client and vendor ledger with running balance." />
 
     <!-- Tabs -->
-    <div class="flex gap-1 mb-5 bg-gray-100 p-1 rounded-lg w-fit">
-      <button
-        v-for="t in [{ id: 'client', label: 'Clients' }, { id: 'vendor', label: 'Vendors' }]"
-        :key="t.id"
-        @click="tab = t.id; reset()"
-        :class="tab === t.id ? 'bg-white text-gray-900 shadow-sm font-semibold' : 'text-gray-500 hover:text-gray-700'"
-        class="px-4 py-2 rounded-md text-sm transition-all"
-      >{{ t.label }}</button>
-    </div>
+    <AppTabs v-model="tab" :tabs="[{ id: 'client', label: 'Clients' }, { id: 'vendor', label: 'Vendors' }]" class="mb-5" />
 
     <!-- Filters -->
     <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 mb-5">
       <div class="flex flex-wrap items-end gap-3">
         <div class="min-w-[200px] flex-1">
           <label class="block text-xs font-medium text-gray-600 mb-1.5">{{ tab === 'client' ? 'Select Client' : 'Select Vendor' }}</label>
-          <select v-model="selectedId" :class="INP" @change="load">
-            <option value="">— Select —</option>
-            <option v-for="e in entities" :key="e.id" :value="e.id">{{ e.name }}{{ e.companyName ? ' (' + e.companyName + ')' : '' }}</option>
-          </select>
+          <SearchableSelect v-model="selectedId" :options="entities" secondary-key="companyName" allow-all all-label="All" all-value="all"
+            :placeholder="tab === 'client' ? 'Search clients' : 'Search vendors'" @change="load" />
         </div>
         <DateRangeFilter
           v-model:preset="filters.period"
@@ -54,36 +36,13 @@
       Loading passbook…
     </div>
 
-    <!-- Empty state -->
-    <div v-if="!selectedId && !loading" class="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center text-gray-400">
-      <svg class="w-12 h-12 mx-auto mb-4 text-gray-200" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"/></svg>
-      Select a {{ tab === 'client' ? 'client' : 'vendor' }} to view their passbook.
-    </div>
-
     <template v-if="data && !loading">
-      <!-- KPI row -->
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
-        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-          <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Opening Balance</p>
-          <p class="text-xl font-bold text-gray-900 mt-1 tabular-nums">{{ fmt(data.openingBalance) }}</p>
-        </div>
-        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-          <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Debit</p>
-          <p class="text-xl font-bold text-red-600 mt-1 tabular-nums">{{ fmt(data.totalDebit) }}</p>
-        </div>
-        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-          <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Credit</p>
-          <p class="text-xl font-bold text-green-600 mt-1 tabular-nums">{{ fmt(data.totalCredit) }}</p>
-        </div>
-        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-          <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Closing Balance</p>
-          <p class="text-xl font-bold mt-1 tabular-nums" :class="data.closingBalance < 0 ? 'text-red-600' : 'text-gray-900'">{{ fmt(data.closingBalance) }}</p>
-        </div>
-      </div>
-
-      <!-- Ledger table -->
-      <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div class="grid items-start gap-5 xl:grid-cols-[minmax(0,4fr)_minmax(260px,1fr)]">
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden" style="--listing-offset: 315px">
         <TableControls
+          :controller="passbookTable"
+          :key="tab"
+          :table-key="`passbook-${tab}`"
           v-model:search="passbookTable.search.value"
           v-model:page="passbookTable.page.value"
           v-model:page-size="passbookTable.pageSize.value"
@@ -92,13 +51,22 @@
           :filtered="passbookTable.filtered.value"
           :start="passbookTable.start.value"
           :end="passbookTable.end.value"
+          :rows="passbookTable.rows.value"
+          :available-columns="[{ key: 'entityName', label: tab === 'client' ? 'Client' : 'Vendor' }, { key: 'bookingVersion', label: 'Booking version' }, { key: 'bookingDestination', label: 'Booking destination' }, { key: 'sourceType', label: 'Source type' }, { key: 'sourceId', label: 'Source ID' }]"
+          :active-filters="passbookActiveFilters"
+          exportable
           search-placeholder="Search transactions, refs..."
+          @export="passbookExport.exportXls"
+          @remove-filter="removePassbookFilter"
         />
         <div class="overflow-x-auto">
-          <table class="w-full text-sm">
+          <table :key="tab" class="w-full text-sm">
             <thead>
               <tr class="bg-gray-50 border-b border-gray-100">
                 <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Date</th>
+                <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{{ tab === 'client' ? 'Client' : 'Vendor' }}</th>
+                <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Booking ID</th>
+                <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Booking Title</th>
                 <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Type</th>
                 <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Description</th>
                 <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Ref</th>
@@ -109,11 +77,14 @@
             </thead>
             <tbody class="divide-y divide-gray-50">
               <tr v-if="data.openingBalance !== 0" class="bg-blue-50/40">
-                <td colspan="6" class="px-4 py-2.5 text-xs text-gray-500 italic">Opening Balance</td>
+                <td colspan="9" class="px-4 py-2.5 text-xs text-gray-500 italic">Opening Balance</td>
                 <td class="px-4 py-2.5 text-right font-semibold text-gray-800 tabular-nums">{{ fmt(data.openingBalance) }}</td>
               </tr>
               <tr v-for="row in passbookTable.rows.value" :key="row.id + row.type" class="hover:bg-gray-50 transition-colors">
                 <td class="px-4 py-3 text-gray-600 whitespace-nowrap">{{ fmtDate(row.date) }}</td>
+                <td class="px-4 py-3 text-gray-700 font-medium">{{ row.entityName }}</td>
+                <td class="px-4 py-3 text-xs font-semibold text-blue-700 whitespace-nowrap">{{ row.bookingNumber || '—' }}</td>
+                <td class="px-4 py-3 text-gray-700 max-w-[220px] truncate" :title="row.bookingTitle || ''">{{ row.bookingTitle || '—' }}</td>
                 <td class="px-4 py-3">
                   <span :class="row.type === 'INVOICE' || row.type === 'BILL' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'"
                     class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium">{{ row.type }}</span>
@@ -125,11 +96,21 @@
                 <td class="px-4 py-3 text-right tabular-nums font-bold" :class="row.balance < 0 ? 'text-red-600' : 'text-gray-900'">{{ fmt(row.balance) }}</td>
               </tr>
               <tr v-if="!passbookTable.filtered.value">
-                <td colspan="7" class="px-4 py-10 text-center text-gray-400">No transactions found for the selected filters.</td>
+                <td colspan="10" class="px-4 py-10 text-center text-gray-400">No transactions found for the selected filters.</td>
               </tr>
             </tbody>
           </table>
         </div>
+      </div>
+      <aside class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm xl:sticky xl:top-5">
+        <header class="bg-gradient-to-r from-indigo-600 to-blue-600 px-5 py-4 text-white"><h2 class="font-semibold">Passbook Summary</h2><p class="mt-0.5 text-xs text-indigo-100">{{ selectedEntityLabel }}</p></header>
+        <dl class="space-y-4 p-5 text-sm">
+          <div class="flex items-center justify-between gap-3"><dt class="text-gray-500">Opening balance</dt><dd class="font-semibold text-gray-900 tabular-nums">{{ fmt(data.openingBalance) }}</dd></div>
+          <div class="flex items-center justify-between gap-3"><dt class="text-gray-500">Total debit</dt><dd class="font-semibold text-red-600 tabular-nums">{{ fmt(data.totalDebit) }}</dd></div>
+          <div class="flex items-center justify-between gap-3"><dt class="text-gray-500">Total credit</dt><dd class="font-semibold text-green-600 tabular-nums">{{ fmt(data.totalCredit) }}</dd></div>
+          <div class="flex items-center justify-between gap-3 border-t border-gray-200 pt-4"><dt class="font-semibold text-gray-700">Closing balance</dt><dd class="text-lg font-bold tabular-nums" :class="data.closingBalance < 0 ? 'text-red-600' : 'text-gray-900'">{{ fmt(data.closingBalance) }}</dd></div>
+        </dl>
+      </aside>
       </div>
     </template>
   </div>
@@ -138,24 +119,51 @@
 <script setup>
 const { request } = useApi()
 const { formatDate } = useDateTime()
-const toast = useToast()
 const { formatMoney } = useMoney()
 const INP = 'w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none'
 const tab = ref('client')
-const selectedId = ref('')
+const selectedId = ref('all')
 const entities = ref([])
 const data = ref(null)
 const loading = ref(false)
 const filters = reactive({ period: 'all', from: '', to: '', type: '' })
 const ledgerRows = computed(() => data.value?.rows || [])
 const passbookTable = useTableControls(ledgerRows, {
-  searchFields: ['type', 'description', 'ref', (row) => fmtDate(row.date)],
+  searchFields: ['type', 'description', 'ref', 'bookingNumber', 'bookingTitle', 'bookingDestination', (row) => fmtDate(row.date)],
 })
+const passbookActiveFilters = computed(() => {
+  const chips = []
+  if (selectedId.value !== 'all') chips.push({ key: 'entity', label: `${tab.value === 'client' ? 'Client' : 'Vendor'}: ${selectedEntityLabel.value}` })
+  const period = periodLabel(filters)
+  if (period) chips.push({ key: 'period', label: period })
+  if (filters.type) chips.push({ key: 'type', label: `Type: ${filters.type === 'debit' ? 'Debit only' : 'Credit only'}` })
+  return chips
+})
+const selectedEntityLabel = computed(() => selectedId.value === 'all' ? `All ${tab.value === 'client' ? 'clients' : 'vendors'}` : entities.value.find(item => Number(item.id) === Number(selectedId.value))?.name || String(selectedId.value))
 
 const fmt = (v) => formatMoney(v)
 const fmtDate = formatDate
+const { periodLabel } = useFilterLabels()
+const passbookExport = useListingSelection(passbookTable, [
+  { key: 'date', label: 'Date', type: 'date', sortValue: row => row.date, field: row => fmtDate(row.date) },
+  { key: 'entityName', label: 'Party', field: 'entityName' },
+  { key: 'bookingNumber', label: 'Booking ID', field: 'bookingNumber' },
+  { key: 'bookingTitle', label: 'Booking Title', field: 'bookingTitle' },
+  { key: 'type', label: 'Type', field: 'type' },
+  { key: 'description', label: 'Description', field: 'description' },
+  { key: 'ref', label: 'Ref', field: 'ref' },
+  { key: 'debit', label: 'Debit', type: 'number', field: row => row.debit ? fmt(row.debit) : '' },
+  { key: 'credit', label: 'Credit', type: 'number', field: row => row.credit ? fmt(row.credit) : '' },
+  { key: 'balance', label: 'Balance', type: 'number', field: row => fmt(row.balance) },
+], 'passbook')
 
-function reset() { selectedId.value = ''; data.value = null }
+function reset() { selectedId.value = 'all'; data.value = null }
+function removePassbookFilter(key) {
+  if (key === 'entity') selectedId.value = 'all'
+  if (key === 'period') Object.assign(filters, { period: 'all', from: '', to: '' })
+  if (key === 'type') filters.type = ''
+  load()
+}
 
 async function loadEntities() {
   entities.value = tab.value === 'client'
@@ -180,19 +188,6 @@ async function load() {
   }
 }
 
-function exportCsv() {
-  if (!data.value) return
-  const rows = passbookTable.filteredRows.value
-  const header = ['Date', 'Type', 'Description', 'Ref', 'Debit', 'Credit', 'Balance']
-  const lines = [header.join(','), ...rows.map(r => [fmtDate(r.date), r.type, `"${r.description}"`, r.ref || '', r.debit || '', r.credit || '', r.balance].join(','))]
-  const blob = new Blob([lines.join('\n')], { type: 'text/csv' })
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(blob)
-  a.download = `passbook-${tab.value}-${selectedId.value}-${Date.now()}.csv`
-  a.click()
-  toast.success('CSV export started.')
-}
-
-watch(tab, () => { loadEntities(); reset() })
-onMounted(loadEntities)
+watch(tab, async () => { reset(); await loadEntities(); await load() })
+onMounted(async () => { await loadEntities(); await load() })
 </script>

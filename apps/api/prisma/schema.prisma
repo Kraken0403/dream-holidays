@@ -32,6 +32,18 @@ enum InvoiceStatus {
   PAID
   OVERDUE
   CANCELLED
+  CONVERTED
+}
+
+enum InvoiceType {
+  INVOICE
+  PROFORMA
+  CREDIT_NOTE
+}
+
+enum VendorBillType {
+  BILL
+  CREDIT_NOTE
 }
 
 enum VendorBillStatus {
@@ -48,6 +60,7 @@ enum JournalSourceType {
   VENDOR_BILL
   VENDOR_PAYMENT
   CREDIT_NOTE
+  VENDOR_CREDIT_NOTE
   REFUND
   MANUAL
 }
@@ -119,6 +132,13 @@ model GlobalSetting {
   updatedAt   DateTime @updatedAt
 }
 
+model DocumentSequence {
+  key         String   @id
+  lastNumber  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 model ServiceCategory {
   id            Int                     @id @default(autoincrement())
   name          String
@@ -160,6 +180,7 @@ model Vendor {
   serviceItems     BookingServiceItem[]
   vendorBills      VendorBill[]
   vendorPayments   VendorPayment[]
+  cancellationCharges BookingCancellationVendorCharge[]
 }
 
 model VendorServiceCategory {
@@ -200,8 +221,12 @@ model Client {
 model Booking {
   id                  Int                  @id @default(autoincrement())
   bookingNumber       String               @unique
+  bookingVersion      Int                  @default(1)
+  seriesRootId        Int?
+  previousVersionId   Int?                 @unique
   bookingDate         DateTime             @default(now())
   clientId            Int
+  clientSnapshot      Json?
   companyId           Int
   salesPersonId       Int?
   title               String
@@ -215,6 +240,7 @@ model Booking {
   totalSaleAmount     Decimal              @default(0.00) @db.Decimal(15, 2)
   totalVendorCost     Decimal              @default(0.00) @db.Decimal(15, 2)
   grossMargin         Decimal              @default(0.00) @db.Decimal(15, 2)
+  currentVersion      Int                  @default(1)
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
 
@@ -227,6 +253,64 @@ model Booking {
   vendorBills         VendorBill[]
   clientPayments      ClientPayment[]
   vendorPayments      VendorPayment[]
+  versions            BookingVersion[]
+  cancellation        BookingCancellation?
+  seriesRoot          Booking?             @relation("BookingSeriesRoot", fields: [seriesRootId], references: [id], onDelete: SetNull)
+  seriesVersions      Booking[]            @relation("BookingSeriesRoot")
+  previousVersion     Booking?             @relation("BookingSeriesPrevious", fields: [previousVersionId], references: [id], onDelete: SetNull)
+  nextVersion         Booking?             @relation("BookingSeriesPrevious")
+
+  @@index([seriesRootId, bookingVersion])
+}
+
+model BookingVersion {
+  id          Int      @id @default(autoincrement())
+  bookingId   Int
+  version     Int
+  changeType  String
+  changeNote  String?  @db.Text
+  snapshot    Json
+  changedById Int?
+  createdAt   DateTime @default(now())
+
+  booking     Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@unique([bookingId, version])
+}
+
+model BookingCancellation {
+  id                       Int                               @id @default(autoincrement())
+  bookingId                Int                               @unique
+  reason                   String                            @db.Text
+  cancelledAt              DateTime                          @default(now())
+  clientChargeSubtotal     Decimal                           @default(0.00) @db.Decimal(15, 2)
+  clientChargeTax          Decimal                           @default(0.00) @db.Decimal(15, 2)
+  clientChargeTotal        Decimal                           @default(0.00) @db.Decimal(15, 2)
+  reversedInvoiceTotal     Decimal                           @default(0.00) @db.Decimal(15, 2)
+  reversedVendorBillTotal  Decimal                           @default(0.00) @db.Decimal(15, 2)
+  clientChargeInvoiceCreated Boolean                         @default(false)
+  vendorChargeBillsCreated Boolean                           @default(false)
+  createdById              Int?
+  createdAt                DateTime                          @default(now())
+
+  booking                  Booking                           @relation(fields: [bookingId], references: [id])
+  vendorCharges            BookingCancellationVendorCharge[]
+  invoices                 Invoice[]
+  vendorBills              VendorBill[]
+}
+
+model BookingCancellationVendorCharge {
+  id              Int                 @id @default(autoincrement())
+  cancellationId  Int
+  vendorId        Int
+  subtotal        Decimal             @default(0.00) @db.Decimal(15, 2)
+  taxAmount       Decimal             @default(0.00) @db.Decimal(15, 2)
+  total           Decimal             @default(0.00) @db.Decimal(15, 2)
+  notes           String?             @db.Text
+  createdAt       DateTime            @default(now())
+
+  cancellation    BookingCancellation @relation(fields: [cancellationId], references: [id], onDelete: Cascade)
+  vendor          Vendor              @relation(fields: [vendorId], references: [id])
 }
 
 model BookingPassenger {
@@ -274,7 +358,12 @@ model Invoice {
   invoiceNumber      String                    @unique
   companyId          Int
   clientId           Int
+  clientSnapshot     Json?
   bookingId          Int?
+  documentType       InvoiceType               @default(INVOICE)
+  originalInvoiceId  Int?
+  convertedFromProformaId Int?                    @unique
+  cancellationId     Int?
   invoiceDate        DateTime                  @default(now())
   dueDate            DateTime?
   placeOfSupply      String?
@@ -287,12 +376,18 @@ model Invoice {
   outstandingAmount  Decimal                   @default(0.00) @db.Decimal(15, 2)
   notes              String?                   @db.Text
   terms              String?                   @db.Text
+  formatSettings     Json?
   createdAt          DateTime                  @default(now())
   updatedAt          DateTime                  @updatedAt
 
   company            Company                   @relation(fields: [companyId], references: [id])
   client             Client                    @relation(fields: [clientId], references: [id])
   booking            Booking?                  @relation(fields: [bookingId], references: [id])
+  originalInvoice    Invoice?                  @relation("InvoiceCreditNotes", fields: [originalInvoiceId], references: [id])
+  creditNotes        Invoice[]                 @relation("InvoiceCreditNotes")
+  convertedFromProforma Invoice?               @relation("ProformaConversion", fields: [convertedFromProformaId], references: [id])
+  convertedInvoice   Invoice?                  @relation("ProformaConversion")
+  cancellation       BookingCancellation?      @relation(fields: [cancellationId], references: [id])
   items              InvoiceItem[]
   paymentAllocations ClientPaymentAllocation[]
 }
@@ -324,6 +419,8 @@ model ClientPayment {
   bankAccountId   Int?
   referenceNumber String?
   notes           String?                   @db.Text
+  proofUrl        String?
+  proofOriginalName String?
   createdAt       DateTime                  @default(now())
   updatedAt       DateTime                  @updatedAt
 
@@ -349,6 +446,9 @@ model VendorBill {
   vendorInvoiceNo   String?
   vendorId          Int
   bookingId         Int?
+  documentType      VendorBillType            @default(BILL)
+  originalBillId    Int?
+  cancellationId    Int?
   billDate          DateTime                  @default(now())
   dueDate           DateTime?
   status            VendorBillStatus          @default(PENDING)
@@ -363,6 +463,9 @@ model VendorBill {
 
   vendor            Vendor                    @relation(fields: [vendorId], references: [id])
   booking           Booking?                  @relation(fields: [bookingId], references: [id])
+  originalBill      VendorBill?               @relation("VendorBillCreditNotes", fields: [originalBillId], references: [id])
+  creditNotes       VendorBill[]              @relation("VendorBillCreditNotes")
+  cancellation      BookingCancellation?      @relation(fields: [cancellationId], references: [id])
   items             VendorBillItem[]
   paymentAllocations VendorPaymentAllocation[]
 }
@@ -393,6 +496,8 @@ model VendorPayment {
   bankAccountId   Int?
   referenceNumber String?
   notes           String?                   @db.Text
+  proofUrl        String?
+  proofOriginalName String?
   createdAt       DateTime                  @default(now())
   updatedAt       DateTime                  @updatedAt
 

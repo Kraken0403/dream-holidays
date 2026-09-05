@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { InvoicesService } from './invoices.service';
 
@@ -20,14 +20,30 @@ export class InvoicesController {
     return this.service.createFromBooking(Number(bookingId), body);
   }
 
+  @Get(':id/deletion-preview')
+  deletionPreview(@Param('id') id: string) { return this.service.deletionPreview(Number(id)); }
+
   @Get(':id')
   findOne(@Param('id') id: string) { return this.service.findOne(Number(id)); }
 
   @Post()
   create(@Body() body: any) { return this.service.createManual(body); }
 
+  @Post(':id/convert')
+  convertProforma(@Param('id') id: string, @Body() body: any) {
+    return this.service.convertProforma(Number(id), body);
+  }
+
+  @Post(':id/refresh-format')
+  refreshFormat(@Param('id') id: string) {
+    return this.service.refreshFormat(Number(id));
+  }
+
   @Post(':id/payments')
   recordPayment(@Param('id') id: string, @Body() body: any) {
     return this.service.recordPayment(Number(id), body);
   }
+
+  @Delete(':id')
+  remove(@Param('id') id: string) { return this.service.hardDelete(Number(id)); }
 }

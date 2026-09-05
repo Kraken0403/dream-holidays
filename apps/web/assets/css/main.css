@@ -1,3 +1,29 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+::placeholder { color: #cbd5e1 !important; opacity: 1; }
+.required-mark { color: #dc2626; }
+table th:first-child:has(input[type='checkbox']), table td:first-child:has(input[type='checkbox']) { vertical-align: top; }
+table td:first-child:has(input[type='checkbox']) input[type='checkbox'] { margin-top: 0.125rem; }
+
+.listing-card {
+  display: flex;
+  height: clamp(420px, calc(100vh - var(--listing-offset, 190px)), 760px);
+  min-height: 420px;
+  flex-direction: column;
+}
+
+.listing-table-scroll {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto !important;
+}
+
+.listing-table-head th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f9fafb;
+  box-shadow: inset 0 -1px #e5e7eb;
+}

@@ -2,15 +2,7 @@
   <div>
     <PageHeader title="Payment Tracking" subtitle="Aging analysis - outstanding receivables and payables." />
 
-    <div class="flex gap-1 mb-5 bg-gray-100 p-1 rounded-lg w-fit">
-      <button
-        v-for="t in [{ id: 'receivables', label: 'Receivables' }, { id: 'payables', label: 'Payables' }]"
-        :key="t.id"
-        @click="tab = t.id"
-        :class="tab === t.id ? 'bg-white text-gray-900 shadow-sm font-semibold' : 'text-gray-500 hover:text-gray-700'"
-        class="px-4 py-2 rounded-md text-sm transition-all"
-      >{{ t.label }}</button>
-    </div>
+    <AppTabs v-model="tab" :tabs="[{ id: 'receivables', label: 'Receivables' }, { id: 'payables', label: 'Payables' }]" class="mb-5" />
 
     <div v-if="loading" class="bg-white rounded-xl border border-gray-200 shadow-sm p-8 text-center text-gray-400">
       <div class="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-3"></div>
@@ -32,6 +24,7 @@
 
       <div v-if="agingRows.length" class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         <TableControls
+          :controller="agingTable"
           v-model:search="agingTable.search.value"
           v-model:page="agingTable.page.value"
           v-model:page-size="agingTable.pageSize.value"
@@ -40,12 +33,16 @@
           :filtered="agingTable.filtered.value"
           :start="agingTable.start.value"
           :end="agingTable.end.value"
+          :rows="agingTable.rows.value"
+          :available-columns="[{ key: 'status', label: 'Status' }, { key: 'client.companyName', label: 'Client company' }, { key: 'vendor.email', label: 'Vendor email' }, { key: 'createdAt', label: 'Created at' }]"
           exportable
           :selected-count="agingSelection.selectedCount.value"
-          :filter-count="bucketFilter ? 1 : 0"
+          :filter-count="[bucketFilter, paymentFilters.from, paymentFilters.to].filter(Boolean).length"
+          :active-filters="paymentActiveFilters"
           :search-placeholder="tab === 'receivables' ? 'Search invoices, clients...' : 'Search bills, vendors...'"
           @export="agingSelection.exportXls"
           @clear-selection="agingSelection.clear"
+          @remove-filter="removePaymentFilter"
         >
           <template #filters>
             <div class="w-full sm:w-44">
@@ -55,6 +52,7 @@
                 <option v-for="bucket in activeBuckets" :key="bucket.key" :value="bucket.key">{{ bucket.label }}</option>
               </select>
             </div>
+            <DateRangeFilter v-model:preset="paymentFilters.period" v-model:from="paymentFilters.from" v-model:to="paymentFilters.to" />
           </template>
         </TableControls>
 
@@ -132,6 +130,7 @@ const tab = ref('receivables')
 const data = ref(null)
 const loading = ref(false)
 const bucketFilter = ref('')
+const paymentFilters = reactive({ period: 'all', from: '', to: '' })
 const fmt = (v) => formatMoney(v)
 const fmtDate = formatDate
 const isPastDue = (d) => d && String(d).slice(0, 10) < todayInput()
@@ -150,8 +149,19 @@ const activeBuckets = computed(() => {
 })
 
 const filteredAgingRows = computed(() => {
-  if (!bucketFilter.value) return agingRows.value
-  return agingRows.value.filter((row) => row.bucketKey === bucketFilter.value)
+  return agingRows.value.filter((row) => {
+    if (bucketFilter.value && row.bucketKey !== bucketFilter.value) return false
+    const date = String(row.invoiceDate || row.billDate || '').slice(0, 10)
+    if (paymentFilters.from && date < paymentFilters.from) return false
+    if (paymentFilters.to && date > paymentFilters.to) return false
+    return true
+  })
+})
+const paymentActiveFilters = computed(() => {
+  const chips = []
+  if (bucketFilter.value) chips.push({ key: 'bucket', label: `Status: ${activeBuckets.value.find(item => item.key === bucketFilter.value)?.label || bucketFilter.value}` })
+  if (paymentFilters.from || paymentFilters.to) chips.push({ key: 'period', label: `Period: ${paymentFilters.from ? fmtDate(paymentFilters.from) : 'Start'} - ${paymentFilters.to ? fmtDate(paymentFilters.to) : 'Today'}` })
+  return chips
 })
 
 const agingTable = useTableControls(filteredAgingRows, {
@@ -177,6 +187,10 @@ function bucketClass(key) {
   if (key === '1_30') return 'bg-yellow-100 text-yellow-700'
   return 'bg-red-100 text-red-700'
 }
+function removePaymentFilter(key) {
+  if (key === 'bucket') bucketFilter.value = ''
+  if (key === 'period') Object.assign(paymentFilters, { period: 'all', from: '', to: '' })
+}
 
 async function load() {
   loading.value = true
@@ -192,6 +206,7 @@ async function load() {
 
 watch(tab, () => {
   bucketFilter.value = ''
+  Object.assign(paymentFilters, { period: 'all', from: '', to: '' })
   agingTable.reset()
   load()
 })
