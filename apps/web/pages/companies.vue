@@ -103,7 +103,6 @@
       </div>
     </div>
 
-    <!-- Company Modal -->
     <AppModal v-model="showModal" :title="editId ? 'Edit Company' : 'Add Company'" subtitle="Configure billing entity details and bank accounts" size="xl" color="blue">
       <form id="co-form" @submit.prevent="save" class="space-y-5">
         <div class="grid grid-cols-2 gap-4">
@@ -136,7 +135,6 @@
           <p class="mt-1 text-xs text-gray-400">{{ logoStatus }}</p>
         </div>
 
-        <!-- Bank Accounts -->
         <div class="border-t border-gray-200 pt-5">
           <div class="flex items-center justify-between mb-4">
             <h4 class="text-sm font-semibold text-gray-900">Bank Accounts</h4>
@@ -175,6 +173,7 @@
 <script setup>
 const { request } = useApi()
 const toast = useToast()
+const route = useRoute()
 const INP = 'w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow'
 const companies = ref([])
 const statusFilter = ref('')
@@ -210,6 +209,7 @@ const form = reactive(blankForm())
 
 function resetForm() { Object.assign(form, blankForm()); logoStatus.value = ''; editId.value = null }
 function openCreate() { resetForm(); showModal.value = true }
+function handleQuickCreate() { if (route.query.create === 'company') openCreate() }
 function openEdit(c) {
   resetForm(); editId.value = c.id
   Object.assign(form, {
@@ -251,5 +251,6 @@ async function save() {
     toast.success(wasEditing ? 'Company updated.' : 'Company created.')
   } finally { saving.value = false }
 }
-onMounted(load)
+watch(() => route.query.quickCreate, handleQuickCreate)
+onMounted(async () => { await load(); handleQuickCreate() })
 </script>
