@@ -10,6 +10,7 @@
       </template>
     </PageHeader>
 
+    <!-- Table -->
     <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       <TableControls
         :controller="bookingTable"
@@ -40,82 +41,265 @@
           </button>
         </template>
         <template #filters>
-          <div class="w-full sm:w-44"><label class="block text-xs font-medium text-gray-600 mb-1.5">Status</label><select v-model="bookingFilters.status" :class="INP"><option value="">All</option><option v-for="status in bookingStatuses" :key="status" :value="status">{{ status }}</option></select></div>
-          <div class="w-full sm:w-56"><label class="block text-xs font-medium text-gray-600 mb-1.5">Client</label><SearchableSelect v-model="bookingFilters.clientId" :options="clients" secondary-key="companyName" allow-all all-label="All clients" all-value="" /></div>
-          <div class="w-full sm:w-56"><label class="block text-xs font-medium text-gray-600 mb-1.5">Company</label><SearchableSelect v-model="bookingFilters.companyId" :options="companies" allow-all all-label="All companies" all-value="" /></div>
-          <DateRangeFilter v-model:preset="bookingFilters.period" v-model:from="bookingFilters.from" v-model:to="bookingFilters.to" />
+          <div class="w-full sm:w-44">
+            <label class="block text-xs font-medium text-gray-600 mb-1.5">Status</label>
+            <select v-model="bookingFilters.status" :class="INP">
+              <option value="">All</option>
+              <option v-for="status in bookingStatuses" :key="status" :value="status">{{ status }}</option>
+            </select>
+          </div>
+          <div class="w-full sm:w-56">
+            <label class="block text-xs font-medium text-gray-600 mb-1.5">Client</label>
+            <SearchableSelect v-model="bookingFilters.clientId" :options="clients" secondary-key="companyName" allow-all all-label="All clients" all-value="" />
+          </div>
+          <div class="w-full sm:w-56">
+            <label class="block text-xs font-medium text-gray-600 mb-1.5">Company</label>
+            <SearchableSelect v-model="bookingFilters.companyId" :options="companies" allow-all all-label="All companies" all-value="" />
+          </div>
+          <DateRangeFilter
+            v-model:preset="bookingFilters.period"
+            v-model:from="bookingFilters.from"
+            v-model:to="bookingFilters.to"
+          />
         </template>
       </TableControls>
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
-          <thead><tr class="border-b border-gray-100 bg-gray-50"><th class="w-10 px-3 py-3"><input type="checkbox" aria-label="Select page" :checked="bookingSelection.pageAllSelected.value" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" @change="bookingSelection.togglePage" /></th><th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Booking ID</th><th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Booking Title</th><th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th><th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Client</th><th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Dates</th><th class="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Sale</th><th class="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Cost</th><th class="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Margin</th><th class="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th></tr></thead>
+          <thead>
+            <tr class="border-b border-gray-100 bg-gray-50">
+              <th class="w-10 px-3 py-3"><input type="checkbox" aria-label="Select page" :checked="bookingSelection.pageAllSelected.value" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" @change="bookingSelection.togglePage" /></th>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Booking ID</th>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Booking Title</th>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Client</th>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Dates</th>
+              <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Sale</th>
+              <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Cost</th>
+              <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Margin</th>
+              <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
+            </tr>
+          </thead>
           <tbody class="divide-y divide-gray-50">
-            <tr v-for="b in bookingTable.rows.value" :key="b.id" class="hover:bg-blue-50/60 cursor-pointer transition-colors" @click="router.push(`/bookings/${b.id}`)">
+            <tr
+              v-for="b in bookingTable.rows.value" :key="b.id"
+              class="hover:bg-blue-50/60 cursor-pointer transition-colors"
+              @click="router.push(`/bookings/${b.id}`)"
+            >
               <td class="w-10 px-3 py-3" @click.stop><input type="checkbox" :aria-label="`Select ${b.bookingNumber}`" :checked="bookingSelection.isSelected(b)" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" @change="bookingSelection.toggle(b)" /></td>
-              <td class="px-4 py-3 whitespace-nowrap"><div class="font-semibold text-gray-900">{{ b.bookingNumber }}</div><div v-if="Number(b.bookingVersion || 1) > 1" class="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-600">Version {{ b.bookingVersion }}</div></td>
+              <td class="px-4 py-3 whitespace-nowrap">
+                <div class="font-semibold text-gray-900">{{ b.bookingNumber }}</div>
+                <div v-if="Number(b.bookingVersion || 1) > 1" class="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-600">Version {{ b.bookingVersion }}</div>
+              </td>
               <td class="px-4 py-3 text-gray-700 max-w-[240px] truncate" :title="b.title || ''">{{ b.title || '—' }}</td>
               <td class="px-4 py-3"><span :class="statusClass(b.status)" class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">{{ b.status }}</span></td>
               <td class="px-4 py-3 text-gray-700">{{ (b.clientSnapshot || b.client)?.name }}</td>
-              <td class="px-4 py-3"><div class="text-gray-700">{{ dateOnly(b.bookingDate) }}</div><div class="text-gray-400 text-xs">{{ dateOnly(b.travelStartDate) }} → {{ dateOnly(b.travelEndDate) }}</div></td>
-              <td class="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums">{{ fmt(b.totalSaleAmount) }}</td><td class="px-4 py-3 text-right text-gray-500 tabular-nums">{{ fmt(b.totalVendorCost) }}</td><td class="px-4 py-3 text-right font-bold tabular-nums" :class="Number(b.grossMargin) >= 0 ? 'text-green-600' : 'text-red-600'">{{ fmt(b.grossMargin) }}</td>
-              <td class="px-4 py-3" @click.stop><div class="flex justify-end gap-1.5"><button v-if="!b.nextVersion" type="button" class="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-100" @click="openVersion(b.id)"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M12 5v14M5 12h14"/></svg>New v{{ Number(b.bookingVersion || 1) + 1 }}</button><button type="button" title="Edit booking" aria-label="Edit booking" class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100" @click="openEdit(b.id)"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m15.2 5.2 3.6 3.6M4 20l4.5-1 10.3-10.2a2.55 2.55 0 0 0-3.6-3.6L5 15.5 4 20Z"/></svg></button><button type="button" title="Delete booking permanently" aria-label="Delete booking permanently" class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" @click="openDelete(b)"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16m-10 4v6m4-6v6M9 4h6l1 3H8l1-3Zm-2 3 1 13h8l1-13"/></svg></button></div></td>
+              <td class="px-4 py-3">
+                <div class="text-gray-700">{{ dateOnly(b.bookingDate) }}</div>
+                <div class="text-gray-400 text-xs">{{ dateOnly(b.travelStartDate) }} → {{ dateOnly(b.travelEndDate) }}</div>
+              </td>
+              <td class="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums">{{ fmt(b.totalSaleAmount) }}</td>
+              <td class="px-4 py-3 text-right text-gray-500 tabular-nums">{{ fmt(b.totalVendorCost) }}</td>
+              <td class="px-4 py-3 text-right font-bold tabular-nums" :class="Number(b.grossMargin) >= 0 ? 'text-green-600' : 'text-red-600'">{{ fmt(b.grossMargin) }}</td>
+              <td class="px-4 py-3" @click.stop>
+                <div class="flex justify-end gap-1.5">
+                  <button v-if="!b.nextVersion" type="button" class="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-100" @click="openVersion(b.id)"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M12 5v14M5 12h14"/></svg>New v{{ Number(b.bookingVersion || 1) + 1 }}</button>
+                  <button type="button" title="Edit booking" aria-label="Edit booking" class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100" @click="openEdit(b.id)"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m15.2 5.2 3.6 3.6M4 20l4.5-1 10.3-10.2a2.55 2.55 0 0 0-3.6-3.6L5 15.5 4 20Z"/></svg></button>
+                  <button type="button" title="Delete booking permanently" aria-label="Delete booking permanently" class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-700 hover:bg-red-100" @click="openDelete(b)"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16m-10 4v6m4-6v6M9 4h6l1 3H8l1-3Zm-2 3 1 13h8l1-13"/></svg></button>
+                </div>
+              </td>
             </tr>
-            <tr v-if="!bookingTable.filtered.value"><td colspan="10" class="px-4 py-12 text-center text-gray-400"><svg class="w-10 h-10 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 00.75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 00-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0112 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 01-.673-.38m0 0A2.18 2.18 0 013 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 013.413-.387m7.5 0V5.25A2.25 2.25 0 0013.5 3h-3a2.25 2.25 0 00-2.25 2.25v.894m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>No bookings yet. Create your first booking.</td></tr>
+            <tr v-if="!bookingTable.filtered.value">
+              <td colspan="10" class="px-4 py-12 text-center text-gray-400">
+                <svg class="w-10 h-10 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 00.75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 00-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0112 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 01-.673-.38m0 0A2.18 2.18 0 013 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 013.413-.387m7.5 0V5.25A2.25 2.25 0 0013.5 3h-3a2.25 2.25 0 00-2.25 2.25v.894m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>
+                No bookings yet. Create your first booking.
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
     </div>
 
+    <!-- Create / version booking modal -->
     <AppModal v-model="showModal" :title="versionSourceId ? `Create Booking Version v${nextBookingVersion}` : editId ? 'Edit Booking' : 'Create Booking'" :subtitle="versionSourceId ? `${editingBooking?.bookingNumber} → new independent booking version` : editId ? `${editingBooking?.bookingNumber} · audit revision ${currentVersion}` : 'Add client details, services and review the final summary'" size="xl" color="blue">
       <form id="booking-form" @submit.prevent="save">
         <AppTabs v-model="bookingFormTab" :tabs="bookingFormTabs" class="mb-5" />
         <div class="space-y-5">
           <section v-if="bookingFormTab === 'details'" class="space-y-5">
-            <div class="max-w-sm">
-              <label class="block text-sm font-medium text-gray-700 mb-1.5">Booking Date <span class="required-mark">*</span></label>
-              <FormattedDateInput v-model="form.bookingDate" :input-class="INP" />
+          <div class="max-w-sm">
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">Booking Date <span class="required-mark">*</span></label>
+            <FormattedDateInput v-model="form.bookingDate" :input-class="INP" />
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <div class="mb-1.5 flex items-center justify-between">
+                <label class="block text-sm font-medium text-gray-700">Client <span class="required-mark">*</span></label>
+                <button type="button" class="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800" @click="openClientCreate"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M12 5v14M5 12h14"/></svg>Add a client</button>
+              </div>
+              <SearchableSelect v-model="form.clientId" :options="clients" secondary-key="companyName" placeholder="Search clients" />
             </div>
-
-            <div class="grid grid-cols-2 gap-4">
-              <div><div class="mb-1.5 flex items-center justify-between"><label class="block text-sm font-medium text-gray-700">Client <span class="required-mark">*</span></label><button type="button" class="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800" @click="openClientCreate"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M12 5v14M5 12h14"/></svg>Add a client</button></div><SearchableSelect v-model="form.clientId" :options="clients" secondary-key="companyName" placeholder="Search clients" /></div>
-              <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Billing Company <span class="required-mark">*</span></label><SearchableSelect v-model="form.companyId" :options="companies" placeholder="Search billing companies" /></div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Billing Company <span class="required-mark">*</span></label>
+              <SearchableSelect v-model="form.companyId" :options="companies" placeholder="Search billing companies" />
             </div>
+          </div>
 
-            <div class="grid grid-cols-2 gap-4"><div><label class="block text-sm font-medium text-gray-700 mb-1.5">Booking Title <span class="required-mark">*</span></label><input v-model="form.title" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required placeholder="e.g. Nitin Patel – Baku Package" /></div><div><label class="block text-sm font-medium text-gray-700 mb-1.5">Destination</label><input v-model="form.destination" placeholder="Destination" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" /></div></div>
-
-            <div class="grid grid-cols-2 gap-4">
-              <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Travel Start</label><FormattedDateInput v-model="form.travelStartDate" :input-class="INP" /></div>
-              <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Number of Nights</label><input v-model.number="form.nights" type="number" min="0" step="1" :class="INP" placeholder="e.g. 5" /></div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Booking Title <span class="required-mark">*</span></label>
+              <input v-model="form.title" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required placeholder="e.g. Nitin Patel – Baku Package" />
             </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Destination</label>
+              <input v-model="form.destination" placeholder="Destination" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+            </div>
+          </div>
 
-            <div><label class="block text-sm font-medium text-gray-700 mb-1.5">Passengers</label><input v-model.number="form.passengerCount" type="number" min="1" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" /></div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Travel Start</label>
+              <FormattedDateInput v-model="form.travelStartDate" :input-class="INP" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Number of Nights</label>
+              <input v-model.number="form.nights" type="number" min="0" step="1" :class="INP" placeholder="e.g. 5" />
+            </div>
+          </div>
+
+          <div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Passengers</label>
+              <input v-model.number="form.passengerCount" type="number" min="1" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+            </div>
+          </div>
           </section>
 
+          <!-- Service Items -->
           <section v-if="bookingFormTab === 'services'">
             <div v-if="documentsLocked" class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">Service items are locked because an invoice or vendor payable has already been generated. You can still update client and trip details as a new version.</div>
-            <div class="flex items-center justify-between mb-3"><h4 class="text-sm font-semibold text-gray-900">Service Items</h4><button v-if="!documentsLocked" type="button" @click="addItem" class="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>Add Item</button></div>
+            <div class="flex items-center justify-between mb-3">
+              <h4 class="text-sm font-semibold text-gray-900">Service Items</h4>
+              <button v-if="!documentsLocked" type="button" @click="addItem" class="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                Add Item
+              </button>
+            </div>
             <div class="space-y-3">
               <fieldset v-for="(item, index) in form.serviceItems" :key="index" :disabled="documentsLocked" class="bg-gray-50 rounded-lg p-4 border border-gray-200 disabled:opacity-70">
-                <div class="grid grid-cols-2 gap-3 mb-3"><div><label class="block text-xs font-medium text-gray-600 mb-1">Category <span class="required-mark">*</span></label><select v-model="item.categoryId" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white" required><option value="">Select</option><option v-for="c in categories" :key="c.id" :value="c.id">{{ c.parent ? c.parent.name + ' / ' : '' }}{{ c.name }}</option></select></div><div><label class="block text-xs font-medium text-gray-600 mb-1">Vendor</label><SearchableSelect v-model="item.vendorId" :options="vendors" placeholder="Search vendors" /></div></div>
-                <div class="mb-3"><label class="block text-xs font-medium text-gray-600 mb-1">Description <span class="required-mark">*</span></label><input v-model="item.description" placeholder="Service description" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required /></div>
-                <div class="grid grid-cols-4 gap-3 items-end"><div><label class="block text-xs font-medium text-gray-600 mb-1">Qty</label><input v-model.number="item.quantity" type="number" min="1" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" /></div><div><label class="block text-xs font-medium text-gray-600 mb-1">Sale Rate</label><input v-model.number="item.saleRate" type="number" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" /></div><div><label class="block text-xs font-medium text-gray-600 mb-1">Vendor Cost</label><input v-model.number="item.vendorCost" type="number" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" /></div><div class="flex items-end gap-2"><div class="flex-1"><label class="block text-xs font-medium text-gray-600 mb-1">Margin</label><div class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-100 font-semibold" :class="itemMargin(item) >= 0 ? 'text-green-700' : 'text-red-600'">{{ fmt(itemMargin(item)) }}</div></div><button type="button" @click="form.serviceItems.splice(index, 1)" class="mb-0.5 p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg></button></div></div>
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                  <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Category <span class="required-mark">*</span></label>
+                    <select v-model="item.categoryId" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white" required>
+                      <option value="">Select</option>
+                      <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.parent ? c.parent.name + ' / ' : '' }}{{ c.name }}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Vendor</label>
+                    <SearchableSelect v-model="item.vendorId" :options="vendors" placeholder="Search vendors" />
+                  </div>
+                </div>
+                <div class="mb-3">
+                  <label class="block text-xs font-medium text-gray-600 mb-1">Description <span class="required-mark">*</span></label>
+                  <input v-model="item.description" placeholder="Service description" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" required />
+                </div>
+                <div class="grid grid-cols-4 gap-3 items-end">
+                  <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Qty</label>
+                    <input v-model.number="item.quantity" type="number" min="1" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Sale Rate</label>
+                    <input v-model.number="item.saleRate" type="number" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Vendor Cost</label>
+                    <input v-model.number="item.vendorCost" type="number" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+                  </div>
+                  <div class="flex items-end gap-2">
+                    <div class="flex-1">
+                      <label class="block text-xs font-medium text-gray-600 mb-1">Margin</label>
+                      <div class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-100 font-semibold" :class="itemMargin(item) >= 0 ? 'text-green-700' : 'text-red-600'">
+                        {{ fmt(itemMargin(item)) }}
+                      </div>
+                    </div>
+                    <button type="button" @click="form.serviceItems.splice(index, 1)" class="mb-0.5 p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>
+                    </button>
+                  </div>
+                </div>
               </fieldset>
             </div>
           </section>
-
           <section v-if="bookingFormTab === 'summary'" class="space-y-4">
-            <div class="grid gap-4 md:grid-cols-2"><article class="rounded-xl border border-blue-100 bg-blue-50 p-4"><p class="text-[11px] font-semibold uppercase tracking-wide text-blue-500">Client and trip</p><h3 class="mt-2 font-semibold text-gray-900">{{ selectedClient?.companyName || selectedClient?.name || 'No client selected' }}</h3><p class="mt-1 text-xs text-gray-600">{{ form.title || 'Untitled booking' }}<span v-if="form.destination"> · {{ form.destination }}</span></p><p class="mt-2 text-xs text-gray-500"><span v-if="form.travelStartDate">{{ dateOnly(form.travelStartDate) }} · {{ Number(form.nights || 0) }} night(s) · </span>{{ form.passengerCount || 1 }} passenger(s)</p></article><article class="rounded-xl border border-emerald-100 bg-emerald-50 p-4"><p class="text-[11px] font-semibold uppercase tracking-wide text-emerald-600">Financial summary</p><dl class="mt-2 space-y-1.5 text-sm"><div class="flex justify-between"><dt class="text-gray-600">Sale</dt><dd class="font-semibold">{{ fmt(formSaleTotal) }}</dd></div><div class="flex justify-between"><dt class="text-gray-600">Vendor cost</dt><dd class="font-semibold">{{ fmt(formVendorTotal) }}</dd></div><div class="flex justify-between border-t border-emerald-200 pt-1.5"><dt class="font-medium">Margin</dt><dd class="font-bold" :class="formMargin >= 0 ? 'text-green-700' : 'text-red-600'">{{ fmt(formMargin) }}</dd></div></dl></article></div>
-            <div class="rounded-xl border border-gray-200 bg-white p-4"><div class="flex items-center justify-between"><div><h3 class="text-sm font-semibold text-gray-900">Accounting documents</h3><p class="mt-0.5 text-xs text-gray-500">Selected documents are generated from the saved booking record.</p></div><span class="text-xs font-medium text-gray-500">{{ form.serviceItems.length }} service item(s)</span></div><div class="mt-3 grid gap-3 md:grid-cols-2"><button type="button" :disabled="hasGeneratedPayables || !hasVendorServices || generatingDocuments" class="flex items-center justify-between rounded-lg border p-3 text-left disabled:cursor-not-allowed disabled:opacity-60" :class="hasGeneratedPayables ? 'border-green-200 bg-green-50' : postCreatePayables ? 'border-indigo-300 bg-indigo-50' : 'border-gray-200 hover:bg-gray-50'" @click="toggleDocumentGeneration('payables')"><span><span class="flex items-center gap-1.5 text-sm font-semibold">Vendor payables</span><span class="mt-1 block text-xs text-gray-500">{{ hasGeneratedPayables ? 'Already created' : postCreatePayables ? 'Will generate after save' : 'Generate after save' }}</span></span></button><button type="button" :disabled="hasGeneratedInvoice || !form.serviceItems.length || generatingDocuments" class="flex items-center justify-between rounded-lg border p-3 text-left disabled:cursor-not-allowed disabled:opacity-60" :class="hasGeneratedInvoice ? 'border-green-200 bg-green-50' : postCreateInvoice ? 'border-blue-300 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'" @click="toggleDocumentGeneration('invoice')"><span><span class="flex items-center gap-1.5 text-sm font-semibold">Client invoice</span><span class="mt-1 block text-xs text-gray-500">{{ hasGeneratedInvoice ? 'Already created' : postCreateInvoice ? 'Will generate after save' : 'Generate after save' }}</span></span></button></div></div>
+            <div class="grid gap-4 md:grid-cols-2">
+              <article class="rounded-xl border border-blue-100 bg-blue-50 p-4"><p class="text-[11px] font-semibold uppercase tracking-wide text-blue-500">Client and trip</p><h3 class="mt-2 font-semibold text-gray-900">{{ selectedClient?.companyName || selectedClient?.name || 'No client selected' }}</h3><p class="mt-1 text-xs text-gray-600">{{ form.title || 'Untitled booking' }}<span v-if="form.destination"> · {{ form.destination }}</span></p><p class="mt-2 text-xs text-gray-500">{{ dateOnly(form.travelStartDate) }} · {{ Number(form.nights || 0) }} night(s) · {{ form.passengerCount || 1 }} passenger(s)</p></article>
+              <article class="rounded-xl border border-emerald-100 bg-emerald-50 p-4"><p class="text-[11px] font-semibold uppercase tracking-wide text-emerald-600">Financial summary</p><dl class="mt-2 space-y-1.5 text-sm"><div class="flex justify-between"><dt class="text-gray-600">Sale</dt><dd class="font-semibold">{{ fmt(formSaleTotal) }}</dd></div><div class="flex justify-between"><dt class="text-gray-600">Vendor cost</dt><dd class="font-semibold">{{ fmt(formVendorTotal) }}</dd></div><div class="flex justify-between border-t border-emerald-200 pt-1.5"><dt class="font-medium">Margin</dt><dd class="font-bold" :class="formMargin >= 0 ? 'text-green-700' : 'text-red-600'">{{ fmt(formMargin) }}</dd></div></dl></article>
+            </div>
+            <div class="rounded-xl border border-gray-200 bg-white p-4">
+              <div class="flex items-center justify-between"><div><h3 class="text-sm font-semibold text-gray-900">Accounting documents</h3><p class="mt-0.5 text-xs text-gray-500">Selected documents are generated from the saved booking record.</p></div><span class="text-xs font-medium text-gray-500">{{ form.serviceItems.length }} service item(s)</span></div>
+              <div class="mt-3 grid gap-3 md:grid-cols-2">
+                <button type="button" :disabled="hasGeneratedPayables || !hasVendorServices || generatingDocuments" class="flex items-center justify-between rounded-lg border p-3 text-left disabled:cursor-not-allowed disabled:opacity-60" :class="hasGeneratedPayables ? 'border-green-200 bg-green-50' : postCreatePayables ? 'border-indigo-300 bg-indigo-50' : 'border-gray-200 hover:bg-gray-50'" @click="toggleDocumentGeneration('payables')"><span><span class="flex items-center gap-1.5 text-sm font-semibold"><svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M3 7h18v13H3V7Zm0 4h18M7 16h4"/></svg>Vendor payables</span><span class="mt-1 block text-xs text-gray-500">{{ hasGeneratedPayables ? 'Already created' : postCreatePayables ? 'Will generate after save' : 'Generate after save' }}</span></span><svg v-if="hasGeneratedPayables || postCreatePayables" class="h-5 w-5 text-green-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="m5 12 4 4L19 6"/></svg></button>
+                <button type="button" :disabled="hasGeneratedInvoice || !form.serviceItems.length || generatingDocuments" class="flex items-center justify-between rounded-lg border p-3 text-left disabled:cursor-not-allowed disabled:opacity-60" :class="hasGeneratedInvoice ? 'border-green-200 bg-green-50' : postCreateInvoice ? 'border-blue-300 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'" @click="toggleDocumentGeneration('invoice')"><span><span class="flex items-center gap-1.5 text-sm font-semibold"><svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M6 3h9l3 3v15H6V3Zm3 7h6M9 14h6"/></svg>Client invoice</span><span class="mt-1 block text-xs text-gray-500">{{ hasGeneratedInvoice ? 'Already created' : postCreateInvoice ? 'Will generate after save' : 'Generate after save' }}</span></span><svg v-if="hasGeneratedInvoice || postCreateInvoice" class="h-5 w-5 text-green-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="m5 12 4 4L19 6"/></svg></button>
+              </div>
+            </div>
             <div v-if="editId || versionSourceId" class="rounded-xl border border-violet-200 bg-violet-50 p-4"><label class="mb-1.5 block text-sm font-semibold text-violet-900">{{ versionSourceId ? `What changed in booking v${nextBookingVersion}?` : 'Audit change note' }} <span class="required-mark">*</span></label><textarea v-model="form.changeNote" rows="3" :class="INP" placeholder="Example: Travel dates moved and hotel rate updated" required></textarea><p class="mt-1 text-xs text-violet-700">{{ versionSourceId ? `${editingBooking?.bookingNumber} remains unchanged. Saving creates a separate booking record with its own invoices and vendor payables.` : `This updates the same booking and records audit revision ${currentVersion + 1}.` }}</p></div>
           </section>
         </div>
       </form>
-      <template #footer><div class="mr-auto flex items-center gap-4"><div><p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Sale</p><p class="text-sm font-bold text-gray-900">{{ fmt(formSaleTotal) }}</p></div><div><p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Cost</p><p class="text-sm font-bold text-gray-900">{{ fmt(formVendorTotal) }}</p></div><div><p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Margin</p><p class="text-sm font-bold" :class="formMargin >= 0 ? 'text-green-700' : 'text-red-600'">{{ fmt(formMargin) }}</p></div></div><label class="flex items-center gap-2 text-xs font-semibold text-gray-600">Status<select v-model="form.status" :disabled="documentsLocked" class="rounded-lg border border-gray-300 bg-white px-2.5 py-2 text-xs outline-none focus:border-blue-500 disabled:bg-gray-100"><option v-if="!['DRAFT', 'CONFIRMED'].includes(form.status)" :value="form.status">{{ form.status }}</option><option>DRAFT</option><option>CONFIRMED</option></select></label><button v-if="bookingFormTab !== 'details'" type="button" class="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50" @click="previousBookingTab">Back</button><button v-if="bookingFormTab !== 'summary'" type="button" class="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700" @click="nextBookingTab">Next</button><button v-else type="submit" form="booking-form" :disabled="saving || generatingDocuments" class="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50">{{ saving ? 'Saving...' : versionSourceId ? `Create v${nextBookingVersion}` : editId ? 'Save Changes' : 'Create Booking' }}</button></template>
+      <template #footer>
+        <div class="mr-auto flex items-center gap-4"><div><p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Sale</p><p class="text-sm font-bold text-gray-900">{{ fmt(formSaleTotal) }}</p></div><div><p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Cost</p><p class="text-sm font-bold text-gray-900">{{ fmt(formVendorTotal) }}</p></div><div><p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Margin</p><p class="text-sm font-bold" :class="formMargin >= 0 ? 'text-green-700' : 'text-red-600'">{{ fmt(formMargin) }}</p></div></div>
+        <label class="flex items-center gap-2 text-xs font-semibold text-gray-600">Status<select v-model="form.status" :disabled="documentsLocked" class="rounded-lg border border-gray-300 bg-white px-2.5 py-2 text-xs outline-none focus:border-blue-500 disabled:bg-gray-100"><option v-if="!['DRAFT', 'CONFIRMED'].includes(form.status)" :value="form.status">{{ form.status }}</option><option>DRAFT</option><option>CONFIRMED</option></select></label>
+        <button v-if="bookingFormTab !== 'details'" type="button" class="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50" @click="previousBookingTab"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="m15 18-6-6 6-6"/></svg>Back</button>
+        <button v-if="bookingFormTab !== 'summary'" type="button" class="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700" @click="nextBookingTab">Next<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="m9 18 6-6-6-6"/></svg></button>
+        <button v-else type="submit" form="booking-form" :disabled="saving || generatingDocuments" class="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"><svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M5 3h11l3 3v15H5V3Zm3 0v6h8V3"/></svg>{{ saving ? 'Saving...' : versionSourceId ? `Create v${nextBookingVersion}` : editId ? 'Save Changes' : 'Create Booking' }}</button>
+      </template>
     </AppModal>
 
-    <AppModal v-model="showDelete" title="Permanently Delete Booking" :subtitle="deleteTarget ? `${deleteTarget.bookingNumber} · ${deleteTarget.title || 'Untitled booking'}` : 'Loading deletion impact…'" size="md" color="red"><div v-if="deletePreview" class="space-y-4"><div class="rounded-xl border border-red-200 bg-red-50 p-4"><p class="text-sm font-bold text-red-900">This action is permanent and cannot be undone.</p><p class="mt-1 text-xs leading-5 text-red-700">The booking will be wiped from operational and accounting records together with every linked invoice, credit note, vendor payable, payment allocation, journal entry, cancellation record, booking history and stored proof/attachment belonging to this booking pipeline.</p></div><div v-if="deletePreview.deletesWholeSeries" class="rounded-xl border border-violet-200 bg-violet-50 p-4"><p class="text-sm font-semibold text-violet-900">This booking belongs to a version series.</p><p class="mt-1 text-xs text-violet-700">Deleting any version deletes the complete series so v1/v2/v3 cannot leave disconnected accounting records.</p><div class="mt-2 flex flex-wrap gap-1.5"><span v-for="item in deletePreview.series" :key="item.id" class="rounded-full border border-violet-200 bg-white px-2 py-1 text-[11px] font-semibold text-violet-700">{{ item.bookingNumber }}</span></div></div><div class="grid grid-cols-2 gap-2 sm:grid-cols-3"><div v-for="item in deleteImpactItems" :key="item.label" class="rounded-lg border border-gray-200 bg-gray-50 p-3"><p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">{{ item.label }}</p><p class="mt-1 text-lg font-bold text-gray-900">{{ item.value }}</p></div></div><p class="text-xs leading-5 text-gray-500">Any payment shared with another booking is protected: deletion will stop and ask you to split that payment first instead of deleting unrelated accounting data.</p></div><div v-else class="py-8 text-center text-sm text-gray-500">Checking linked booking and accounting records…</div><template #footer><button type="button" class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="showDelete = false">Keep Booking</button><button type="button" :disabled="deleting || !deletePreview" class="rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50" @click="confirmDelete">{{ deleting ? 'Deleting…' : 'Delete Permanently' }}</button></template></AppModal>
+    <AppModal v-model="showDelete" title="Permanently Delete Booking" :subtitle="deleteTarget ? `${deleteTarget.bookingNumber} · ${deleteTarget.title || 'Untitled booking'}` : 'Loading deletion impact…'" size="md" color="red">
+      <div v-if="deletePreview" class="space-y-4">
+        <div class="rounded-xl border border-red-200 bg-red-50 p-4">
+          <p class="text-sm font-bold text-red-900">This action is permanent and cannot be undone.</p>
+          <p class="mt-1 text-xs leading-5 text-red-700">The booking will be wiped from operational and accounting records together with every linked invoice, credit note, vendor payable, payment allocation, journal entry, cancellation record, booking history and stored proof/attachment belonging to this booking pipeline.</p>
+        </div>
+        <div v-if="deletePreview.deletesWholeSeries" class="rounded-xl border border-violet-200 bg-violet-50 p-4">
+          <p class="text-sm font-semibold text-violet-900">This booking belongs to a version series.</p>
+          <p class="mt-1 text-xs text-violet-700">Deleting any version deletes the complete series so v1/v2/v3 cannot leave disconnected accounting records.</p>
+          <div class="mt-2 flex flex-wrap gap-1.5"><span v-for="item in deletePreview.series" :key="item.id" class="rounded-full border border-violet-200 bg-white px-2 py-1 text-[11px] font-semibold text-violet-700">{{ item.bookingNumber }}</span></div>
+        </div>
+        <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <div v-for="item in deleteImpactItems" :key="item.label" class="rounded-lg border border-gray-200 bg-gray-50 p-3"><p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">{{ item.label }}</p><p class="mt-1 text-lg font-bold text-gray-900">{{ item.value }}</p></div>
+        </div>
+        <p class="text-xs leading-5 text-gray-500">Any payment shared with another booking is protected: deletion will stop and ask you to split that payment first instead of deleting unrelated accounting data.</p>
+      </div>
+      <div v-else class="py-8 text-center text-sm text-gray-500">Checking linked booking and accounting records…</div>
+      <template #footer>
+        <button type="button" class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="showDelete = false">Keep Booking</button>
+        <button type="button" :disabled="deleting || !deletePreview" class="rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50" @click="confirmDelete">{{ deleting ? 'Deleting…' : 'Delete Permanently' }}</button>
+      </template>
+    </AppModal>
 
-    <AppModal v-model="showClientModal" title="Add a Client" subtitle="Create the client without leaving this booking" size="md" color="blue"><form id="inline-client-form" class="space-y-4" @submit.prevent="saveClient"><div class="grid grid-cols-2 gap-4"><div><label class="mb-1.5 block text-sm font-medium text-gray-700">Name <span class="required-mark">*</span></label><input v-model="clientForm.name" placeholder="Client name" :class="INP" required /></div><div><label class="mb-1.5 block text-sm font-medium text-gray-700">Company Name</label><input v-model="clientForm.companyName" placeholder="Company name" :class="INP" /></div></div><div class="grid grid-cols-2 gap-4"><div><label class="mb-1.5 block text-sm font-medium text-gray-700">Phone</label><input v-model="clientForm.phone" placeholder="Phone number" :class="INP" /></div><div><label class="mb-1.5 block text-sm font-medium text-gray-700">Email</label><input v-model="clientForm.email" placeholder="Email address" type="email" :class="INP" /></div></div><div class="grid grid-cols-2 gap-4"><div><label class="mb-1.5 block text-sm font-medium text-gray-700">GST Number</label><input v-model="clientForm.gstNumber" placeholder="GST number" :class="INP" /></div><div><label class="mb-1.5 block text-sm font-medium text-gray-700">State</label><StateSelect v-model="clientForm.state" /></div></div><div><label class="mb-1.5 block text-sm font-medium text-gray-700">Billing Address</label><textarea v-model="clientForm.billingAddress" rows="5" placeholder="Full billing address" :class="INP"></textarea></div></form><template #footer><button type="button" class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="showClientModal = false">Cancel</button><button type="submit" form="inline-client-form" :disabled="savingClient" class="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">{{ savingClient ? 'Saving…' : 'Save & Select Client' }}</button></template></AppModal>
+    <AppModal v-model="showClientModal" title="Add a Client" subtitle="Create the client without leaving this booking" size="md" color="blue">
+      <form id="inline-client-form" class="space-y-4" @submit.prevent="saveClient">
+        <div class="grid grid-cols-2 gap-4">
+          <div><label class="mb-1.5 block text-sm font-medium text-gray-700">Name <span class="required-mark">*</span></label><input v-model="clientForm.name" placeholder="Client name" :class="INP" required /></div>
+          <div><label class="mb-1.5 block text-sm font-medium text-gray-700">Company Name</label><input v-model="clientForm.companyName" placeholder="Company name" :class="INP" /></div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div><label class="mb-1.5 block text-sm font-medium text-gray-700">Phone</label><input v-model="clientForm.phone" placeholder="Phone number" :class="INP" /></div>
+          <div><label class="mb-1.5 block text-sm font-medium text-gray-700">Email</label><input v-model="clientForm.email" placeholder="Email address" type="email" :class="INP" /></div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div><label class="mb-1.5 block text-sm font-medium text-gray-700">GST Number</label><input v-model="clientForm.gstNumber" placeholder="GST number" :class="INP" /></div>
+          <div><label class="mb-1.5 block text-sm font-medium text-gray-700">State</label><StateSelect v-model="clientForm.state" /></div>
+        </div>
+        <div><label class="mb-1.5 block text-sm font-medium text-gray-700">Billing Address</label><textarea v-model="clientForm.billingAddress" rows="5" placeholder="Full billing address" :class="INP"></textarea></div>
+      </form>
+      <template #footer>
+        <button type="button" class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50" @click="showClientModal = false">Cancel</button>
+        <button type="submit" form="inline-client-form" :disabled="savingClient" class="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">{{ savingClient ? 'Saving…' : 'Save & Select Client' }}</button>
+      </template>
+    </AppModal>
   </div>
 </template>
 
@@ -155,11 +339,29 @@ const blankForm = () => ({ clientId: '', companyId: '', title: '', destination: 
 const form = reactive(blankForm())
 const blankClient = () => ({ name: '', companyName: '', phone: '', email: '', gstNumber: '', state: '', billingAddress: '' })
 const clientForm = reactive(blankClient())
-const filteredBookings = computed(() => bookings.value.filter((booking) => { if (bookingFilters.status && booking.status !== bookingFilters.status) return false; if (bookingFilters.clientId && Number(booking.clientId) !== Number(bookingFilters.clientId)) return false; if (bookingFilters.companyId && Number(booking.companyId) !== Number(bookingFilters.companyId)) return false; const date = String(booking.bookingDate || '').slice(0, 10); if (bookingFilters.from && date < bookingFilters.from) return false; if (bookingFilters.to && date > bookingFilters.to) return false; return true }))
-const bookingTable = useTableControls(filteredBookings, { searchFields: ['bookingNumber', 'title', 'destination', 'status', 'client.name', 'company.name'] })
+const filteredBookings = computed(() => bookings.value.filter((booking) => {
+  if (bookingFilters.status && booking.status !== bookingFilters.status) return false
+  if (bookingFilters.clientId && Number(booking.clientId) !== Number(bookingFilters.clientId)) return false
+  if (bookingFilters.companyId && Number(booking.companyId) !== Number(bookingFilters.companyId)) return false
+  const date = String(booking.bookingDate || '').slice(0, 10)
+  if (bookingFilters.from && date < bookingFilters.from) return false
+  if (bookingFilters.to && date > bookingFilters.to) return false
+  return true
+}))
+const bookingTable = useTableControls(filteredBookings, {
+  searchFields: ['bookingNumber', 'title', 'destination', 'status', 'client.name', 'company.name'],
+})
+
 const dateOnly = formatDate
 const selectedClient = computed(() => clients.value.find(client => Number(client.id) === Number(form.clientId)) || editingBooking.value?.clientSnapshot || editingBooking.value?.client || null)
-const bookingActiveFilters = computed(() => { const chips = []; if (bookingFilters.status) chips.push({ key: 'status', label: `Status: ${bookingFilters.status}` }); if (bookingFilters.clientId) chips.push({ key: 'client', label: `Client: ${clients.value.find(item => Number(item.id) === Number(bookingFilters.clientId))?.name || bookingFilters.clientId}` }); if (bookingFilters.companyId) chips.push({ key: 'company', label: `Company: ${companies.value.find(item => Number(item.id) === Number(bookingFilters.companyId))?.name || bookingFilters.companyId}` }); const period = periodLabel(bookingFilters); if (period) chips.push({ key: 'period', label: period }); return chips })
+const bookingActiveFilters = computed(() => {
+  const chips = []
+  if (bookingFilters.status) chips.push({ key: 'status', label: `Status: ${bookingFilters.status}` })
+  if (bookingFilters.clientId) chips.push({ key: 'client', label: `Client: ${clients.value.find(item => Number(item.id) === Number(bookingFilters.clientId))?.name || bookingFilters.clientId}` })
+  if (bookingFilters.companyId) chips.push({ key: 'company', label: `Company: ${companies.value.find(item => Number(item.id) === Number(bookingFilters.companyId))?.name || bookingFilters.companyId}` })
+  const period = periodLabel(bookingFilters); if (period) chips.push({ key: 'period', label: period })
+  return chips
+})
 const formSaleTotal = computed(() => form.serviceItems.reduce((total, item) => total + Number(item.quantity || 1) * Number(item.saleRate || 0) + Number(item.saleTax || 0), 0))
 const formVendorTotal = computed(() => form.serviceItems.reduce((total, item) => total + Number(item.quantity || 1) * Number(item.vendorCost || 0) + Number(item.vendorTax || 0), 0))
 const formMargin = computed(() => formSaleTotal.value - formVendorTotal.value)
@@ -171,33 +373,234 @@ const hasGeneratedInvoice = computed(() => existingInvoices.value.length > 0)
 const hasGeneratedPayables = computed(() => existingVendorBills.value.length > 0)
 const documentsLocked = computed(() => Boolean(editId.value && (hasGeneratedInvoice.value || hasGeneratedPayables.value)))
 const hasVendorServices = computed(() => form.serviceItems.some(item => item.vendorId))
-const deleteImpactItems = computed(() => { const counts = deletePreview.value?.counts || {}; return [{ label: 'Bookings', value: counts.bookings || 0 }, { label: 'Invoices', value: counts.invoices || 0 }, { label: 'Vendor payables', value: counts.vendorBills || 0 }, { label: 'Payments', value: Number(counts.clientPayments || 0) + Number(counts.vendorPayments || 0) }, { label: 'Journal entries', value: counts.journalEntries || 0 }, { label: 'Stored files', value: counts.storedFiles || 0 }] })
-const bookingSelection = useListingSelection(bookingTable, [{ key: 'bookingNumber', label: 'Booking ID', field: 'bookingNumber' }, { key: 'bookingTitle', label: 'Booking Title', field: 'title' }, { key: 'status', label: 'Status', field: 'status' }, { key: 'clientName', label: 'Client', field: (row) => (row.clientSnapshot || row.client)?.name || '' }, { key: 'bookingDates', label: 'Dates', type: 'date', sortValue: (row) => row.bookingDate, field: (row) => `${dateOnly(row.bookingDate)} | ${dateOnly(row.travelStartDate)} - ${dateOnly(row.travelEndDate)}` }, { key: 'totalSaleAmount', label: 'Sale', type: 'number', field: (row) => fmt(row.totalSaleAmount) }, { key: 'totalVendorCost', label: 'Cost', type: 'number', field: (row) => fmt(row.totalVendorCost) }, { key: 'grossMargin', label: 'Margin', type: 'number', field: (row) => fmt(row.grossMargin) }], 'my-bookings')
+const deleteImpactItems = computed(() => {
+  const counts = deletePreview.value?.counts || {}
+  return [
+    { label: 'Bookings', value: counts.bookings || 0 },
+    { label: 'Invoices', value: counts.invoices || 0 },
+    { label: 'Vendor payables', value: counts.vendorBills || 0 },
+    { label: 'Payments', value: Number(counts.clientPayments || 0) + Number(counts.vendorPayments || 0) },
+    { label: 'Journal entries', value: counts.journalEntries || 0 },
+    { label: 'Stored files', value: counts.storedFiles || 0 },
+  ]
+})
+const bookingSelection = useListingSelection(bookingTable, [
+  { key: 'bookingNumber', label: 'Booking ID', field: 'bookingNumber' },
+  { key: 'bookingTitle', label: 'Booking Title', field: 'title' },
+  { key: 'status', label: 'Status', field: 'status' },
+  { key: 'clientName', label: 'Client', field: (row) => (row.clientSnapshot || row.client)?.name || '' },
+  { key: 'bookingDates', label: 'Dates', type: 'date', sortValue: (row) => row.bookingDate, field: (row) => `${dateOnly(row.bookingDate)} | ${dateOnly(row.travelStartDate)} - ${dateOnly(row.travelEndDate)}` },
+  { key: 'totalSaleAmount', label: 'Sale', type: 'number', field: (row) => fmt(row.totalSaleAmount) },
+  { key: 'totalVendorCost', label: 'Cost', type: 'number', field: (row) => fmt(row.totalVendorCost) },
+  { key: 'grossMargin', label: 'Margin', type: 'number', field: (row) => fmt(row.grossMargin) },
+], 'my-bookings')
 function addItem() { form.serviceItems.push(blankItem()) }
-function addDays(date, days) { if (!date) return ''; const [year, month, day] = String(date).split('-').map(Number); if (!year || !month || !day) return ''; return new Date(Date.UTC(year, month - 1, day + Number(days || 0))).toISOString().slice(0, 10) }
-function nightsBetween(start, end) { if (!start || !end) return 1; const diff = Math.round((new Date(`${end}T00:00:00Z`) - new Date(`${start}T00:00:00Z`)) / 86400000); return Math.max(0, diff) }
+function addDays(date, days) {
+  if (!date) return ''
+  const [year, month, day] = String(date).split('-').map(Number)
+  if (!year || !month || !day) return ''
+  return new Date(Date.UTC(year, month - 1, day + Number(days || 0))).toISOString().slice(0, 10)
+}
+function nightsBetween(start, end) {
+  if (!start || !end) return 1
+  const diff = Math.round((new Date(`${end}T00:00:00Z`) - new Date(`${start}T00:00:00Z`)) / 86400000)
+  return Math.max(0, diff)
+}
 function syncTravelEndDate() { form.travelEndDate = form.travelStartDate ? addDays(form.travelStartDate, Number(form.nights || 0)) : '' }
 function removeBookingFilter(key) { if (key === 'status') bookingFilters.status = ''; if (key === 'client') bookingFilters.clientId = ''; if (key === 'company') bookingFilters.companyId = ''; if (key === 'period') Object.assign(bookingFilters, { period: 'all', from: '', to: '' }) }
 function resetForm() { Object.assign(form, blankForm()); editId.value = null; versionSourceId.value = null; editingBooking.value = null; bookingFormTab.value = 'details'; postCreateInvoice.value = false; postCreatePayables.value = false }
 function openCreate() { resetForm(); showModal.value = true }
 function handleQuickCreate() { if (route.query.create === 'booking') openCreate() }
 function toDateInput(value) { return value ? String(value).slice(0, 10) : '' }
-function populateBookingForm(booking, forNewVersion = false) { editingBooking.value = booking; bookingFormTab.value = 'details'; postCreateInvoice.value = false; postCreatePayables.value = false; const travelStartDate = toDateInput(booking.travelStartDate); const travelEndDate = toDateInput(booking.travelEndDate); Object.assign(form, { clientId: booking.clientId, companyId: booking.companyId, title: booking.title || '', destination: booking.destination || '', bookingDate: toDateInput(booking.bookingDate), travelStartDate, nights: nightsBetween(travelStartDate, travelEndDate), travelEndDate, passengerCount: Number(booking.passengerCount || 1), status: forNewVersion && !['DRAFT', 'CONFIRMED'].includes(booking.status) ? 'DRAFT' : booking.status, clientNotes: booking.clientNotes || '', changeNote: '', serviceItems: (booking.serviceItems || []).map(item => ({ id: item.id, categoryId: item.categoryId, vendorId: item.vendorId || '', description: item.description, serviceDate: toDateInput(booking.bookingDate), quantity: Number(item.quantity || 1), saleRate: Number(item.saleRate || 0), saleTax: Number(item.saleTax || 0), vendorCost: Number(item.vendorCost || 0), vendorTax: Number(item.vendorTax || 0) })) }); showModal.value = true }
-async function openEdit(id) { const booking = await request(`/bookings/${id}`); editId.value = booking.id; versionSourceId.value = null; populateBookingForm(booking, false) }
-async function openVersion(id) { const booking = await request(`/bookings/${id}`); if (booking.nextVersion) return toast.warning(`Create the next version from ${booking.nextVersion.bookingNumber}.`); editId.value = null; versionSourceId.value = booking.id; populateBookingForm(booking, true) }
-async function openDelete(booking) { deleteTarget.value = booking; deletePreview.value = null; showDelete.value = true; try { deletePreview.value = await request(`/bookings/${booking.id}/deletion-preview`) } catch (error) { showDelete.value = false; toast.error(error?.data?.message || error?.message || 'Unable to inspect linked booking records.') } }
-async function confirmDelete() { if (!deleteTarget.value || !deletePreview.value) return; deleting.value = true; try { const result = await request(`/bookings/${deleteTarget.value.id}`, { method: 'DELETE' }); showDelete.value = false; bookingSelection.clear(); await load(); toast.success(`${result.counts?.bookings || 1} booking record(s) and the linked accounting pipeline were permanently deleted.`) } finally { deleting.value = false } }
-function nextBookingTab() { if (bookingFormTab.value === 'details') { if (!form.clientId || !form.companyId || !String(form.title || '').trim() || !form.bookingDate) return toast.warning('Complete the required client and booking fields first.'); if (Number(form.nights) < 0) return toast.warning('Number of nights cannot be negative.'); syncTravelEndDate(); bookingFormTab.value = 'services' } else { if (!documentsLocked.value && (!form.serviceItems.length || form.serviceItems.some(item => !item.categoryId || !String(item.description || '').trim()))) return toast.warning('Add at least one service item and complete its required fields.'); bookingFormTab.value = 'summary' } }
+function populateBookingForm(booking, forNewVersion = false) {
+  editingBooking.value = booking
+  bookingFormTab.value = 'details'
+  postCreateInvoice.value = false
+  postCreatePayables.value = false
+  const travelStartDate = toDateInput(booking.travelStartDate)
+  const travelEndDate = toDateInput(booking.travelEndDate)
+  Object.assign(form, {
+    clientId: booking.clientId, companyId: booking.companyId, title: booking.title || '', destination: booking.destination || '',
+    bookingDate: toDateInput(booking.bookingDate), travelStartDate, nights: nightsBetween(travelStartDate, travelEndDate), travelEndDate,
+    passengerCount: Number(booking.passengerCount || 1), status: forNewVersion && !['DRAFT', 'CONFIRMED'].includes(booking.status) ? 'DRAFT' : booking.status, clientNotes: booking.clientNotes || '', changeNote: '',
+    serviceItems: (booking.serviceItems || []).map(item => ({ id: item.id, categoryId: item.categoryId, vendorId: item.vendorId || '', description: item.description, serviceDate: toDateInput(booking.bookingDate), quantity: Number(item.quantity || 1), saleRate: Number(item.saleRate || 0), saleTax: Number(item.saleTax || 0), vendorCost: Number(item.vendorCost || 0), vendorTax: Number(item.vendorTax || 0) })),
+  })
+  showModal.value = true
+}
+async function openEdit(id) {
+  const booking = await request(`/bookings/${id}`)
+  editId.value = booking.id
+  versionSourceId.value = null
+  populateBookingForm(booking, false)
+}
+async function openVersion(id) {
+  const booking = await request(`/bookings/${id}`)
+  if (booking.nextVersion) return toast.warning(`Create the next version from ${booking.nextVersion.bookingNumber}.`)
+  editId.value = null
+  versionSourceId.value = booking.id
+  populateBookingForm(booking, true)
+}
+async function openDelete(booking) {
+  deleteTarget.value = booking
+  deletePreview.value = null
+  showDelete.value = true
+  try {
+    deletePreview.value = await request(`/bookings/${booking.id}/deletion-preview`)
+  } catch (error) {
+    showDelete.value = false
+    toast.error(error?.data?.message || error?.message || 'Unable to inspect linked booking records.')
+  }
+}
+async function confirmDelete() {
+  if (!deleteTarget.value || !deletePreview.value) return
+  deleting.value = true
+  try {
+    const result = await request(`/bookings/${deleteTarget.value.id}`, { method: 'DELETE' })
+    showDelete.value = false
+    bookingSelection.clear()
+    await load()
+    toast.success(`${result.counts?.bookings || 1} booking record(s) and the linked accounting pipeline were permanently deleted.`)
+  } finally {
+    deleting.value = false
+  }
+}
+function nextBookingTab() {
+  if (bookingFormTab.value === 'details') {
+    if (!form.clientId || !form.companyId || !String(form.title || '').trim() || !form.bookingDate) return toast.warning('Complete the required client and booking fields first.')
+    if (Number(form.nights) < 0) return toast.warning('Number of nights cannot be negative.')
+    syncTravelEndDate()
+    bookingFormTab.value = 'services'
+  } else {
+    if (!documentsLocked.value && (!form.serviceItems.length || form.serviceItems.some(item => !item.categoryId || !String(item.description || '').trim()))) return toast.warning('Add at least one service item and complete its required fields.')
+    bookingFormTab.value = 'summary'
+  }
+}
 function previousBookingTab() { bookingFormTab.value = bookingFormTab.value === 'summary' ? 'services' : 'details' }
 function openClientCreate() { Object.assign(clientForm, blankClient()); showClientModal.value = true }
-async function saveClient() { savingClient.value = true; try { const client = await request('/clients', { method: 'POST', body: { ...clientForm } }); clients.value.unshift(client); form.clientId = client.id; showClientModal.value = false; toast.success('Client created and selected.') } finally { savingClient.value = false } }
-function itemMargin(item) { const quantity = Number(item.quantity || 1); return (quantity * Number(item.saleRate || 0) + Number(item.saleTax || 0)) - (quantity * Number(item.vendorCost || 0) + Number(item.vendorTax || 0)) }
-function statusClass(s) { const map = { DRAFT: 'bg-gray-100 text-gray-700', CONFIRMED: 'bg-blue-100 text-blue-700', PARTIALLY_INVOICED: 'bg-indigo-100 text-indigo-700', INVOICED: 'bg-purple-100 text-purple-700', PARTIALLY_PAID: 'bg-yellow-100 text-yellow-700', PAID: 'bg-green-100 text-green-700', CLOSED: 'bg-slate-100 text-slate-700', CANCELLED: 'bg-red-100 text-red-700' }; return map[s] || 'bg-gray-100 text-gray-600' }
-async function load() { [bookings.value, clients.value, companies.value, categories.value, vendors.value] = await Promise.all([request('/bookings'), request('/clients'), request('/companies'), request('/categories'), request('/vendors')]) }
-async function generateSelectedVendorPayables() { const bookingIds = bookingSelection.selectedRows.value.map((item) => item.id); if (!bookingIds.length) return; generatingPayables.value = true; try { const result = await request('/vendor-payables/from-bookings', { method: 'POST', body: { bookingIds } }); if (result.failedCount) toast.warning(`${result.createdCount} vendor payable(s) generated; ${result.failedCount} booking(s) had nothing available.`); else toast.success(`${result.createdCount} vendor payable(s) generated from ${result.successCount} booking(s).`); bookingSelection.clear(); await load() } finally { generatingPayables.value = false } }
-function toggleDocumentGeneration(type) { if (type === 'invoice') postCreateInvoice.value = !postCreateInvoice.value; else postCreatePayables.value = !postCreatePayables.value }
-function validateBooking() { if (!form.clientId || !form.companyId || !String(form.title || '').trim() || !form.bookingDate) { bookingFormTab.value = 'details'; toast.warning('Complete the required client and booking fields first.'); return false } if (Number(form.nights) < 0) { bookingFormTab.value = 'details'; toast.warning('Number of nights cannot be negative.'); return false } if (!documentsLocked.value && (!form.serviceItems.length || form.serviceItems.some(item => !item.categoryId || !String(item.description || '').trim()))) { bookingFormTab.value = 'services'; toast.warning('Add at least one service item and complete its required fields.'); return false } if ((editId.value || versionSourceId.value) && !String(form.changeNote || '').trim()) { bookingFormTab.value = 'summary'; toast.warning(versionSourceId.value ? 'Describe what changed in this booking version.' : 'Add an audit change note for this edit.'); return false } return true }
-async function save() { if (!validateBooking()) return; saving.value = true; try { const wasEditing = Boolean(editId.value); const wasVersioning = Boolean(versionSourceId.value); syncTravelEndDate(); const payload = JSON.parse(JSON.stringify(form)); delete payload.nights; payload.serviceItems = payload.serviceItems.map(item => ({ ...item, serviceDate: payload.bookingDate, saleTotal: Number(item.quantity || 1) * Number(item.saleRate || 0) + Number(item.saleTax || 0), vendorTotal: Number(item.quantity || 1) * Number(item.vendorCost || 0) + Number(item.vendorTax || 0) })); payload.expectedVersion = editId.value ? currentVersion.value : undefined; if (documentsLocked.value) delete payload.serviceItems; const savedBooking = versionSourceId.value ? await request(`/bookings/${versionSourceId.value}/version`, { method: 'POST', body: payload }) : editId.value ? await request(`/bookings/${editId.value}`, { method: 'PATCH', body: payload }) : await request('/bookings', { method: 'POST', body: payload }); const generationFailures = []; if (postCreatePayables.value) { try { await request(`/vendor-payables/from-booking/${savedBooking.id}`, { method: 'POST' }) } catch (error) { generationFailures.push(error?.data?.message || 'Vendor payables could not be generated.') } } if (postCreateInvoice.value) { try { await request(`/invoices/from-booking/${savedBooking.id}`, { method: 'POST', body: {} }) } catch (error) { generationFailures.push(error?.data?.message || 'Invoice could not be generated.') } } showModal.value = false; resetForm(); await load(); const savedLabel = wasVersioning ? 'New booking version created' : wasEditing ? 'Booking updated' : 'Booking created'; if (generationFailures.length) toast.warning(`${savedLabel}, but ${generationFailures.join(' ')}`); else toast.success(`${savedLabel}.`); if (savedBooking?.id) router.push(`/bookings/${savedBooking.id}`) } finally { saving.value = false } }
+async function saveClient() {
+  savingClient.value = true
+  try {
+    const client = await request('/clients', { method: 'POST', body: { ...clientForm } })
+    clients.value.unshift(client)
+    form.clientId = client.id
+    showClientModal.value = false
+    toast.success('Client created and selected.')
+  } finally {
+    savingClient.value = false
+  }
+}
+function itemMargin(item) {
+  const quantity = Number(item.quantity || 1)
+  return (quantity * Number(item.saleRate || 0) + Number(item.saleTax || 0))
+    - (quantity * Number(item.vendorCost || 0) + Number(item.vendorTax || 0))
+}
+
+function statusClass(s) {
+  const map = { DRAFT: 'bg-gray-100 text-gray-700', CONFIRMED: 'bg-blue-100 text-blue-700', PARTIALLY_INVOICED: 'bg-indigo-100 text-indigo-700', INVOICED: 'bg-purple-100 text-purple-700', PARTIALLY_PAID: 'bg-yellow-100 text-yellow-700', PAID: 'bg-green-100 text-green-700', CLOSED: 'bg-slate-100 text-slate-700', CANCELLED: 'bg-red-100 text-red-700' }
+  return map[s] || 'bg-gray-100 text-gray-600'
+}
+
+async function load() {
+  [bookings.value, clients.value, companies.value, categories.value, vendors.value] = await Promise.all([
+    request('/bookings'), request('/clients'), request('/companies'), request('/categories'), request('/vendors'),
+  ])
+}
+
+async function generateSelectedVendorPayables() {
+  const bookingIds = bookingSelection.selectedRows.value.map((item) => item.id)
+  if (!bookingIds.length) return
+  generatingPayables.value = true
+  try {
+    const result = await request('/vendor-payables/from-bookings', { method: 'POST', body: { bookingIds } })
+    if (result.failedCount) {
+      toast.warning(`${result.createdCount} vendor payable(s) generated; ${result.failedCount} booking(s) had nothing available.`)
+    } else {
+      toast.success(`${result.createdCount} vendor payable(s) generated from ${result.successCount} booking(s).`)
+    }
+    bookingSelection.clear()
+    await load()
+  } finally {
+    generatingPayables.value = false
+  }
+}
+
+function toggleDocumentGeneration(type) {
+  if (type === 'invoice') postCreateInvoice.value = !postCreateInvoice.value
+  else postCreatePayables.value = !postCreatePayables.value
+}
+
+function validateBooking() {
+  if (!form.clientId || !form.companyId || !String(form.title || '').trim() || !form.bookingDate) {
+    bookingFormTab.value = 'details'
+    toast.warning('Complete the required client and booking fields first.')
+    return false
+  }
+  if (Number(form.nights) < 0) {
+    bookingFormTab.value = 'details'
+    toast.warning('Number of nights cannot be negative.')
+    return false
+  }
+  if (!documentsLocked.value && (!form.serviceItems.length || form.serviceItems.some(item => !item.categoryId || !String(item.description || '').trim()))) {
+    bookingFormTab.value = 'services'
+    toast.warning('Add at least one service item and complete its required fields.')
+    return false
+  }
+  if ((editId.value || versionSourceId.value) && !String(form.changeNote || '').trim()) {
+    bookingFormTab.value = 'summary'
+    toast.warning(versionSourceId.value ? 'Describe what changed in this booking version.' : 'Add an audit change note for this edit.')
+    return false
+  }
+  return true
+}
+
+async function save() {
+  if (!validateBooking()) return
+  saving.value = true
+  try {
+    const wasEditing = Boolean(editId.value)
+    const wasVersioning = Boolean(versionSourceId.value)
+    syncTravelEndDate()
+    const payload = JSON.parse(JSON.stringify(form))
+    delete payload.nights
+    payload.serviceItems = payload.serviceItems.map(item => ({
+      ...item,
+      serviceDate: payload.bookingDate,
+      saleTotal: Number(item.quantity || 1) * Number(item.saleRate || 0) + Number(item.saleTax || 0),
+      vendorTotal: Number(item.quantity || 1) * Number(item.vendorCost || 0) + Number(item.vendorTax || 0),
+    }))
+    payload.expectedVersion = editId.value ? currentVersion.value : undefined
+    if (documentsLocked.value) delete payload.serviceItems
+    const savedBooking = versionSourceId.value
+      ? await request(`/bookings/${versionSourceId.value}/version`, { method: 'POST', body: payload })
+      : editId.value
+        ? await request(`/bookings/${editId.value}`, { method: 'PATCH', body: payload })
+        : await request('/bookings', { method: 'POST', body: payload })
+    const generationFailures = []
+    if (postCreatePayables.value) {
+      try { await request(`/vendor-payables/from-booking/${savedBooking.id}`, { method: 'POST' }) }
+      catch (error) { generationFailures.push(error?.data?.message || 'Vendor payables could not be generated.') }
+    }
+    if (postCreateInvoice.value) {
+      try { await request(`/invoices/from-booking/${savedBooking.id}`, { method: 'POST', body: {} }) }
+      catch (error) { generationFailures.push(error?.data?.message || 'Invoice could not be generated.') }
+    }
+    showModal.value = false
+    resetForm()
+    await load()
+    const savedLabel = wasVersioning ? 'New booking version created' : wasEditing ? 'Booking updated' : 'Booking created'
+    if (generationFailures.length) toast.warning(`${savedLabel}, but ${generationFailures.join(' ')}`)
+    else toast.success(`${savedLabel}.`)
+    if (savedBooking?.id) router.push(`/bookings/${savedBooking.id}`)
+  } finally {
+    saving.value = false
+  }
+}
+
 watch(() => route.query.quickCreate, handleQuickCreate)
-onMounted(async () => { await load(); if (route.query.version) await openVersion(route.query.version); else if (route.query.edit) await openEdit(route.query.edit); else handleQuickCreate() })
+onMounted(async () => {
+  await load()
+  if (route.query.version) await openVersion(route.query.version)
+  else if (route.query.edit) await openEdit(route.query.edit)
+  else handleQuickCreate()
+})
 </script>
