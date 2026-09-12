@@ -98,6 +98,7 @@
 <script setup>
 const { request } = useApi()
 const toast = useToast()
+const route = useRoute()
 const INP = 'w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow'
 const clients = ref([])
 const stateFilter = ref('')
@@ -119,6 +120,7 @@ const clientSelection = useListingSelection(clientTable, [
 ], 'clients')
 function openCreate() { editId.value = null; Object.assign(form, blank()); showModal.value = true }
 function openEdit(client) { editId.value = client.id; Object.assign(form, blank(), client); showModal.value = true }
+function handleQuickCreate() { if (route.query.create === 'client') openCreate() }
 async function archiveClient(client) {
   if (!window.confirm(`Delete ${client.name}? Existing bookings, invoices and payments will remain unchanged.`)) return
   await request(`/clients/${client.id}`, { method: 'DELETE' })
@@ -137,5 +139,6 @@ async function save() {
   await load()
   toast.success(wasEditing ? 'Client updated.' : 'Client created.')
 }
-onMounted(load)
+watch(() => route.query.quickCreate, handleQuickCreate)
+onMounted(async () => { await load(); handleQuickCreate() })
 </script>
