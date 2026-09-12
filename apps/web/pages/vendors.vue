@@ -101,6 +101,7 @@
 <script setup>
 const { request } = useApi()
 const toast = useToast()
+const route = useRoute()
 const INP = 'w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow'
 const vendors = ref([]), categories = ref([])
 const categoryFilter = ref('')
@@ -128,6 +129,7 @@ const vendorSelection = useListingSelection(vendorTable, [
   { key: 'gstNumber', label: 'GST', field: 'gstNumber' },
 ], 'vendors')
 function openCreate() { Object.assign(form, { name: '', phone: '', email: '', gstNumber: '', categoryIds: [] }); showModal.value = true }
+function handleQuickCreate() { if (route.query.create === 'vendor') openCreate() }
 async function load() { vendors.value = await request('/vendors'); categories.value = await request('/categories') }
 async function save() {
   await request('/vendors', { method: 'POST', body: { ...form } })
@@ -135,5 +137,6 @@ async function save() {
   await load()
   toast.success('Vendor created.')
 }
-onMounted(load)
+watch(() => route.query.quickCreate, handleQuickCreate)
+onMounted(async () => { await load(); handleQuickCreate() })
 </script>
